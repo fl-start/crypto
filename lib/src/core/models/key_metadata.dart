@@ -17,6 +17,8 @@ sealed class KeyMetadataBase {
   final KeyType keyType;
 
   const KeyMetadataBase({required this.algorithm, required this.keyType});
+
+  Map<String, dynamic> toMap();
 }
 
 // ── OpenPGP ──────────────────────────────────────────────────────────────────
@@ -45,6 +47,9 @@ final class OpenPgpPublicKeyMetadata extends KeyMetadataBase {
   /// User IDs (name + email + comment) bound to this key.
   final List<PgpIdentity> identities;
 
+  /// Encryption/signing subkeys bundled with the primary key.
+  final List<OpenPgpPublicKeyMetadata> subKeys;
+
   OpenPgpPublicKeyMetadata._({
     required this.algorithmName,
     required this.keyId,
@@ -56,7 +61,25 @@ final class OpenPgpPublicKeyMetadata extends KeyMetadataBase {
     required this.canSign,
     required this.canEncrypt,
     required this.identities,
+    required this.subKeys,
   }) : super(algorithm: CryptoAlgorithm.openPgp, keyType: KeyType.publicKey);
+
+  /// All key IDs for this keyring (primary + [subKeys]), upper-case hex.
+  ///
+  /// PKESK packets in encrypted messages typically reference the encryption
+  /// subkey ID, not the primary key ID returned by [keyId] alone.
+  List<String> get allKeyIds => [
+        if (keyId.isNotEmpty) keyId,
+        for (final sub in subKeys)
+          if (sub.keyId.isNotEmpty) sub.keyId,
+      ];
+
+  /// Short key IDs (last 32 bits) for [allKeyIds].
+  List<String> get allKeyIdsShort => [
+        if (keyIdShort.isNotEmpty) keyIdShort,
+        for (final sub in subKeys)
+          if (sub.keyIdShort.isNotEmpty) sub.keyIdShort,
+      ];
 
   /// Constructs from the serialized [Map] produced by the OpenPGP worker.
   factory OpenPgpPublicKeyMetadata.fromMap(Map<String, dynamic> map) {
@@ -71,7 +94,25 @@ final class OpenPgpPublicKeyMetadata extends KeyMetadataBase {
       canSign: map['canSign'] as bool? ?? false,
       canEncrypt: map['canEncrypt'] as bool? ?? false,
       identities: _parseIdentities(map['identities']),
+      subKeys: _parsePublicSubKeys(map['subKeys']),
     );
+  }
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'algorithmName': algorithmName,
+      'keyId': keyId,
+      'keyIdShort': keyIdShort,
+      'keyIdNumeric': keyIdNumeric,
+      'fingerprint': fingerprint,
+      'creationTime': creationTime,
+      'isSubKey': isSubKey,
+      'canSign': canSign,
+      'canEncrypt': canEncrypt,
+      'identities': identities.map((id) => id.toMap()).toList(),
+      'subKeys': subKeys.map((k) => k.toMap()).toList(),
+    };
   }
 }
 
@@ -98,6 +139,9 @@ final class OpenPgpPrivateKeyMetadata extends KeyMetadataBase {
   /// User IDs (name + email + comment) bound to this key.
   final List<PgpIdentity> identities;
 
+  /// Subkeys bundled with the primary private key.
+  final List<OpenPgpPrivateKeyMetadata> subKeys;
+
   OpenPgpPrivateKeyMetadata._({
     required this.keyId,
     required this.keyIdShort,
@@ -108,7 +152,15 @@ final class OpenPgpPrivateKeyMetadata extends KeyMetadataBase {
     required this.isEncrypted,
     required this.canSign,
     required this.identities,
+    required this.subKeys,
   }) : super(algorithm: CryptoAlgorithm.openPgp, keyType: KeyType.privateKey);
+
+  /// All key IDs for this keyring (primary + [subKeys]), upper-case hex.
+  List<String> get allKeyIds => [
+        if (keyId.isNotEmpty) keyId,
+        for (final sub in subKeys)
+          if (sub.keyId.isNotEmpty) sub.keyId,
+      ];
 
   /// Constructs from the serialized [Map] produced by the OpenPGP worker.
   factory OpenPgpPrivateKeyMetadata.fromMap(Map<String, dynamic> map) {
@@ -122,7 +174,24 @@ final class OpenPgpPrivateKeyMetadata extends KeyMetadataBase {
       isEncrypted: map['encrypted'] as bool? ?? false,
       canSign: map['canSign'] as bool? ?? false,
       identities: _parseIdentities(map['identities']),
+      subKeys: _parsePrivateSubKeys(map['subKeys']),
     );
+  }
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'keyId': keyId,
+      'keyIdShort': keyIdShort,
+      'keyIdNumeric': keyIdNumeric,
+      'fingerprint': fingerprint,
+      'creationTime': creationTime,
+      'isSubKey': isSubKey,
+      'isEncrypted': isEncrypted,
+      'canSign': canSign,
+      'identities': identities.map((id) => id.toMap()).toList(),
+      'subKeys': subKeys.map((k) => k.toMap()).toList(),
+    };
   }
 }
 
@@ -143,9 +212,35 @@ final class PgpIdentity {
 
   @override
   String toString() => id;
+
+  Map<String, dynamic> toMap() {
+    return {'id': id, 'name': name, 'email': email, 'comment': comment};
+  }
 }
 
 // ── S/MIME ────────────────────────────────────────────────────────────────────
+
+/// Normalizes S/MIME certificate identifiers for lookup and matching.
+///
+/// Handles colon-delimited hex, `0x` prefixes, and uppercase normalization
+/// so [SmimePublicKeyMetadata.certId] matches [SmimeRecipientInfoEntry.certId]
+/// from encrypted messages.
+abstract final class SmimeCertId {
+  static String normalize(String value) {
+    return value
+        .replaceAll(':', '')
+        .replaceAll(' ', '')
+        .replaceFirst(RegExp(r'^0x', caseSensitive: false), '')
+        .toUpperCase();
+  }
+
+  /// Builds a canonical cert ID from an X.509 serial number string.
+  static String fromSerial(String serialNumber) => normalize(serialNumber);
+
+  /// Last 8 hex characters of [certId] (analogous to OpenPGP [keyIdShort]).
+  static String shortFrom(String certId) =>
+      certId.length >= 8 ? certId.substring(certId.length - 8) : certId;
+}
 
 /// Metadata for an S/MIME public key (X.509 certificate).
 ///
@@ -159,6 +254,9 @@ final class SmimePublicKeyMetadata extends KeyMetadataBase {
 
   /// Certificate serial number (colon-delimited hex string).
   final String serialNumber;
+
+  /// X.509 Subject Key Identifier extension (uppercase hex, no colons), if present.
+  final String? subjectKeyIdentifier;
 
   final DateTime validFrom;
   final DateTime validTo;
@@ -197,6 +295,7 @@ final class SmimePublicKeyMetadata extends KeyMetadataBase {
     required this.subjectDn,
     required this.issuerDn,
     required this.serialNumber,
+    this.subjectKeyIdentifier,
     required this.validFrom,
     required this.validTo,
     required this.emailAddress,
@@ -212,6 +311,39 @@ final class SmimePublicKeyMetadata extends KeyMetadataBase {
   }) : super(algorithm: CryptoAlgorithm.smime, keyType: KeyType.publicKey);
 
   bool get isExpired => validTo.isBefore(DateTime.now().toUtc());
+
+  /// Canonical certificate identifier for lookup (normalized serial number).
+  ///
+  /// Use this to match recipients parsed from encrypted S/MIME messages via
+  /// [SmimeRecipientInfoEntry.certId].
+  String get certId => SmimeCertId.fromSerial(serialNumber);
+
+  /// Short form of [certId] — last 8 hex characters.
+  String get certIdShort => SmimeCertId.shortFrom(certId);
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'subjectDn': subjectDn,
+      'issuerDn': issuerDn,
+      'serialNumber': serialNumber,
+      'subjectKeyIdentifier': subjectKeyIdentifier,
+      'certId': certId,
+      'certIdShort': certIdShort,
+      'validFrom': validFrom,
+      'validTo': validTo,
+      'emailAddress': emailAddress,
+      'commonName': commonName,
+      'publicKeyAlgorithm': publicKeyAlgorithm,
+      'keyLength': keyLength,
+      'sha256Fingerprint': sha256Fingerprint,
+      'sha1Fingerprint': sha1Fingerprint,
+      'x509Version': x509Version,
+      'isSelfSigned': isSelfSigned,
+      'keyUsages': keyUsages,
+      'extendedKeyUsages': extendedKeyUsages,
+    };
+  }
 }
 
 /// Metadata for an S/MIME private key.
@@ -234,6 +366,15 @@ final class SmimePrivateKeyMetadata extends KeyMetadataBase {
     required this.keyLength,
     this.associatedCertificate,
   }) : super(algorithm: CryptoAlgorithm.smime, keyType: KeyType.privateKey);
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'privateKeyAlgorithm': privateKeyAlgorithm,
+      'keyLength': keyLength,
+      'associatedCertificate': associatedCertificate?.toMap(),
+    };
+  }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -249,4 +390,26 @@ List<PgpIdentity> _parseIdentities(dynamic raw) {
       comment: m['comment'] as String? ?? '',
     );
   }).toList();
+}
+
+List<OpenPgpPublicKeyMetadata> _parsePublicSubKeys(dynamic raw) {
+  if (raw == null) return const [];
+  return (raw as List)
+      .map(
+        (e) => OpenPgpPublicKeyMetadata.fromMap(
+          Map<String, dynamic>.from(e as Map),
+        ),
+      )
+      .toList();
+}
+
+List<OpenPgpPrivateKeyMetadata> _parsePrivateSubKeys(dynamic raw) {
+  if (raw == null) return const [];
+  return (raw as List)
+      .map(
+        (e) => OpenPgpPrivateKeyMetadata.fromMap(
+          Map<String, dynamic>.from(e as Map),
+        ),
+      )
+      .toList();
 }

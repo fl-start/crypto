@@ -5,6 +5,8 @@ import 'package:openpgp/openpgp.dart';
 
 import '../../core/contracts/i_crypto_provider.dart';
 import '../../core/contracts/i_key_inspection_provider.dart';
+import '../../core/contracts/i_message_inspection_provider.dart';
+import '../../core/models/encrypted_message_metadata.dart';
 import '../../core/exceptions/crypto_exceptions.dart';
 import '../../core/logging/crypto_logger.dart';
 import '../../core/models/crypto_algorithm.dart';
@@ -13,6 +15,7 @@ import '../../core/models/key_generation_params.dart';
 import '../../core/models/key_metadata.dart';
 import '../../core/models/key_type.dart';
 import '../../core/models/signature_verification_result.dart';
+import 'parsing/openpgp_message_parser.dart';
 import 'worker/openpgp_op.dart';
 import 'worker/openpgp_worker_pool.dart';
 
@@ -27,7 +30,8 @@ import 'worker/openpgp_worker_pool.dart';
 ///
 /// Key format:
 ///   [CryptoKey.rawBytes] = UTF-8 bytes of the ASCII-armored OpenPGP key block.
-class OpenPgpCryptoProvider implements ICryptoProvider, IKeyInspectionProvider {
+class OpenPgpCryptoProvider
+    implements ICryptoProvider, IKeyInspectionProvider, IMessageInspectionProvider {
   final OpenPgpWorkerPool _pool;
   final CryptoLogger _log;
 
@@ -338,6 +342,31 @@ class OpenPgpCryptoProvider implements ICryptoProvider, IKeyInspectionProvider {
       _log.error('OpenPGP getPrivateKeyMetadata failed', e);
       throw CryptoOperationException(
         'OpenPGP getPrivateKeyMetadata failed: $e',
+        algorithm: algorithm,
+        cause: e,
+      );
+    }
+  }
+
+  // ── Message inspection ─────────────────────────────────────────────────────
+
+  /// Parses [ciphertext] and returns [OpenPgpEncryptedMessageMetadata].
+  ///
+  /// Extracts all PKESK packets (recipient key IDs, public-key algorithms,
+  /// etc.) without decrypting the message. Runs synchronously in pure Dart —
+  /// no worker isolate is needed because no native OpenPGP calls are made.
+  @override
+  Future<OpenPgpEncryptedMessageMetadata> parseEncryptedMessage(
+    Uint8List ciphertext,
+  ) async {
+    try {
+      return OpenPgpMessageParser.parse(ciphertext);
+    } on CryptoArgumentException {
+      rethrow;
+    } catch (e) {
+      _log.error('OpenPGP parseEncryptedMessage failed', e);
+      throw CryptoOperationException(
+        'OpenPGP parseEncryptedMessage failed: $e',
         algorithm: algorithm,
         cause: e,
       );

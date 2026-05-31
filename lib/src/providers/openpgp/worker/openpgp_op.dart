@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:flutter/services.dart';
+import 'package:openpgp/model/bridge_model_generated.dart' as model;
 import 'package:openpgp/openpgp.dart';
+import 'package:openpgp/openpgp_bridge.dart';
 
 const _binaryEnvelopePrefix = '__SECM_B64__:';
 
@@ -148,9 +150,40 @@ Future<bool> _verify(Map<String, Object?> p) async {
 Future<Map<String, dynamic>> _getPublicKeyMetadata(
   Map<String, Object?> p,
 ) async {
-  final meta = await OpenPGP.getPublicKeyMetadata(
-    utf8.decode(_bytes(p['publicKey'])),
+  final requestBuilder = model.GetPublicKeyMetadataRequestObjectBuilder(
+    publicKey: utf8.decode(_bytes(p['publicKey'])),
   );
+  final data = await OpenPGPBridge.call(
+    'getPublicKeyMetadata',
+    requestBuilder.toBytes(),
+  );
+  final response = model.PublicKeyMetadataResponse(data);
+  if (response.error != null && response.error!.isNotEmpty) {
+    throw OpenPGPException(response.error!);
+  }
+  return _publicKeyMetadataToMap(response.output!);
+}
+
+/// Returns a plain [Map] (sendable across isolate boundary) containing the
+/// fields of the `openpgp` package's native [PrivateKeyMetadata].
+Future<Map<String, dynamic>> _getPrivateKeyMetadata(
+  Map<String, Object?> p,
+) async {
+  final requestBuilder = model.GetPrivateKeyMetadataRequestObjectBuilder(
+    privateKey: utf8.decode(_bytes(p['privateKey'])),
+  );
+  final data = await OpenPGPBridge.call(
+    'getPrivateKeyMetadata',
+    requestBuilder.toBytes(),
+  );
+  final response = model.PrivateKeyMetadataResponse(data);
+  if (response.error != null && response.error!.isNotEmpty) {
+    throw OpenPGPException(response.error!);
+  }
+  return _privateKeyMetadataToMap(response.output!);
+}
+
+Map<String, dynamic> _publicKeyMetadataToMap(model.PublicKeyMetadata meta) {
   return {
     'algorithm': meta.algorithm,
     'keyId': meta.keyId,
@@ -161,27 +194,12 @@ Future<Map<String, dynamic>> _getPublicKeyMetadata(
     'isSubKey': meta.isSubKey,
     'canSign': meta.canSign,
     'canEncrypt': meta.canEncrypt,
-    'identities': meta.identities
-        .map(
-          (id) => {
-            'id': id.id,
-            'name': id.name,
-            'email': id.email,
-            'comment': id.comment,
-          },
-        )
-        .toList(),
+    'identities': _identitiesToMaps(meta.identities),
+    'subKeys': meta.subKeys?.map(_publicKeyMetadataToMap).toList() ?? [],
   };
 }
 
-/// Returns a plain [Map] (sendable across isolate boundary) containing the
-/// fields of the `openpgp` package's native [PrivateKeyMetadata].
-Future<Map<String, dynamic>> _getPrivateKeyMetadata(
-  Map<String, Object?> p,
-) async {
-  final meta = await OpenPGP.getPrivateKeyMetadata(
-    utf8.decode(_bytes(p['privateKey'])),
-  );
+Map<String, dynamic> _privateKeyMetadataToMap(model.PrivateKeyMetadata meta) {
   return {
     'keyId': meta.keyId,
     'keyIdShort': meta.keyIdShort,
@@ -191,15 +209,21 @@ Future<Map<String, dynamic>> _getPrivateKeyMetadata(
     'isSubKey': meta.isSubKey,
     'encrypted': meta.encrypted,
     'canSign': meta.canSign,
-    'identities': meta.identities
-        .map(
-          (id) => {
-            'id': id.id,
-            'name': id.name,
-            'email': id.email,
-            'comment': id.comment,
-          },
-        )
-        .toList(),
+    'identities': _identitiesToMaps(meta.identities),
+    'subKeys': meta.subKeys?.map(_privateKeyMetadataToMap).toList() ?? [],
   };
+}
+
+List<Map<String, String>> _identitiesToMaps(List<model.Identity>? identities) {
+  if (identities == null) return const [];
+  return identities
+      .map(
+        (id) => {
+          'id': id.id ?? '',
+          'name': id.name ?? '',
+          'email': id.email ?? '',
+          'comment': id.comment ?? '',
+        },
+      )
+      .toList();
 }

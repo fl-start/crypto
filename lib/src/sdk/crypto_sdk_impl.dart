@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import '../core/contracts/i_crypto_provider.dart';
 import '../core/contracts/i_execution_strategy.dart';
 import '../core/contracts/i_key_inspection_provider.dart';
+import '../core/contracts/i_message_inspection_provider.dart';
+import '../core/models/encrypted_message_metadata.dart';
 import '../core/contracts/i_storage_provider.dart';
 import '../core/exceptions/crypto_exceptions.dart';
 import '../core/logging/crypto_logger.dart';
@@ -316,6 +318,77 @@ class CryptoSdk {
       );
     }
     return (provider as IKeyInspectionProvider).getPrivateKeyMetadata(key);
+  }
+
+  // ── Message inspection ─────────────────────────────────────────────────────
+
+  /// Parses [ciphertext] and returns structured metadata without decrypting.
+  ///
+  /// For OpenPGP this includes all PKESK packets (recipient [keyId]s,
+  /// public-key algorithms, etc.). For S/MIME this includes all CMS recipient
+  /// info records (issuer/serial, SKI, key encryption algorithm, etc.).
+  ///
+  /// The concrete return type depends on the algorithm:
+  /// - OpenPGP → [OpenPgpEncryptedMessageMetadata]
+  /// - S/MIME  → [SmimeEncryptedMessageMetadata]
+  ///
+  /// Throws [CryptoOperationException] if the registered provider for
+  /// [algorithm] does not implement [IMessageInspectionProvider].
+  Future<EncryptedMessageMetadataBase> parseEncryptedMessage({
+    required Uint8List ciphertext,
+    required CryptoAlgorithm algorithm,
+  }) {
+    final provider = _registry.require(algorithm);
+    if (provider is! IMessageInspectionProvider) {
+      throw CryptoOperationException(
+        'The registered ${algorithm.name} provider does not support '
+        'encrypted message inspection.',
+        algorithm: algorithm,
+      );
+    }
+    return _executionStrategy.execute(
+      () => (provider as IMessageInspectionProvider).parseEncryptedMessage(
+        ciphertext,
+      ),
+      dataSizeHint: ciphertext.length,
+    );
+  }
+
+  /// Returns all recipient key IDs from an OpenPGP encrypted message.
+  ///
+  /// Multi-recipient messages include one PKESK per recipient, so this always
+  /// returns a [List] (empty when none found, one element for single-recipient
+  /// messages, multiple for multi-recipient).
+  Future<List<String>> getRecipientKeyIds({
+    required Uint8List ciphertext,
+  }) async {
+    final parsed = await parseEncryptedMessage(
+      ciphertext: ciphertext,
+      algorithm: CryptoAlgorithm.openPgp,
+    );
+    return switch (parsed) {
+      OpenPgpEncryptedMessageMetadata meta => meta.recipientKeyIds,
+      _ => const [],
+    };
+  }
+
+  /// Returns all recipient certificate IDs from an S/MIME encrypted message.
+  ///
+  /// Multi-recipient messages include one CMS recipient info per certificate,
+  /// so this always returns a [List] (empty when none found, one element for
+  /// single-recipient messages, multiple for multi-recipient).
+  Future<List<String>> getRecipientCertIds({
+    required Uint8List ciphertext,
+  }) async {
+    final parsed = await parseEncryptedMessage(
+      ciphertext: ciphertext,
+      algorithm: CryptoAlgorithm.smime,
+    );
+    print("getRecipientCertIds: ${parsed.toMap()}");
+    return switch (parsed) {
+      SmimeEncryptedMessageMetadata meta => meta.recipientCertIds,
+      _ => const [],
+    };
   }
 
   // ── SDK-managed secure storage ─────────────────────────────────────────────

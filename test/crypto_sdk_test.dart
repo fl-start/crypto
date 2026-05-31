@@ -26,6 +26,9 @@ class _InMemoryStorageProvider implements ISecureStorageProvider {
 
   @override
   Future<void> deleteAll() async => _store.clear();
+
+  @override
+  Future<List<String>> readAllKeys() async => _store.keys.toList();
 }
 
 // ── Stub providers for unit testing ───────────────────────────────────────

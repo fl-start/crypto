@@ -3,7 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../../../core/logging/crypto_logger.dart';
+import '../../../core/models/encrypted_message_metadata.dart';
 import '../../../core/models/key_metadata.dart';
+import '../parsing/smime_message_parser.dart';
 
 /// Low-level S/MIME operations backed by the system `openssl` CLI.
 ///
@@ -215,6 +217,140 @@ class SmimeOpensslEngine {
     }
   }
 
+  // ── Encrypted message inspection ───────────────────────────────────────────
+
+  /// Parses an S/MIME [encryptedData] message and returns recipient metadata.
+  ///
+  /// Uses `openssl cms -cmsout -print` to inspect the CMS EnvelopedData
+  /// structure without decrypting the payload.
+  Future<SmimeEncryptedMessageMetadata> parseEncryptedMessage(
+    Uint8List encryptedData,
+  ) async {
+    final tmp = await _TempFiles.create();
+    try {
+      final mimeText = utf8.decode(encryptedData, allowMalformed: true);
+      final smime = ensureSmimeText(normalizeSmimeText(mimeText));
+      await tmp.write('encrypted_data.p7m', utf8.encode(smime));
+      final smimePath = tmp.path('encrypted_data.p7m');
+
+      final cmsPrintOutput = await _obtainCmsPrintOutput(tmp, smimePath);
+      final pkcs7Der = await _extractPkcs7Der(tmp, tmp.path('extracted.pkcs7.pem'));
+
+      return SmimeMessageParser.parse(
+        cmsPrintOutput: cmsPrintOutput,
+        mimeText: smime,
+        pkcs7Der: pkcs7Der,
+      );
+    } finally {
+      await _safeCleanup(tmp, tag: 'parseEncryptedMessage');
+    }
+  }
+
+  /// Obtains human-readable CMS structure text for an S/MIME message.
+  ///
+  /// Messages produced by `openssl smime -encrypt` are parsed most reliably by
+  /// first extracting the PKCS#7 blob via `smime -pk7out`, then printing with
+  /// `cms -print`. Direct `cms -inform SMIME` can return an empty structure on
+  /// some OpenSSL builds (notably on Windows).
+  Future<String> _obtainCmsPrintOutput(_TempFiles tmp, String smimePath) async {
+    final pkcs7Path = tmp.path('extracted.pkcs7.pem');
+
+    // Primary: smime -pk7out → cms -print (matches smime -encrypt output).
+    final pkcs7Result = await Process.run(opensslPath, [
+      'smime',
+      '-inform',
+      'SMIME',
+      '-in',
+      smimePath,
+      '-pk7out',
+      '-out',
+      pkcs7Path,
+    ]);
+    if (pkcs7Result.exitCode == 0) {
+      final printed = await _runCmsPrint(tmp.path('extracted.pkcs7.pem'));
+      if (_hasRecipientData(printed)) return printed;
+    }
+
+    // Fallback: cms -inform SMIME directly on the MIME file.
+    final direct = await _runCmsPrint(smimePath, inform: 'SMIME');
+    if (_hasRecipientData(direct)) return direct;
+
+    // Last resort: pkcs7 -print on the MIME wrapper.
+    final pkcs7Print = await _runOpenSslPrint([
+      'pkcs7',
+      '-inform',
+      'SMIME',
+      '-in',
+      smimePath,
+      '-print',
+      '-noout',
+    ]);
+    if (_hasRecipientData(pkcs7Print)) return pkcs7Print;
+
+    // Return the best attempt so callers can still read content cipher etc.
+    return direct.isNotEmpty ? direct : pkcs7Print;
+  }
+
+  Future<String> _runCmsPrint(String inputPath, {String inform = 'PEM'}) async {
+    return _runOpenSslPrint([
+      'cms',
+      '-inform',
+      inform,
+      '-in',
+      inputPath,
+      '-cmsout',
+      '-print',
+    ]);
+  }
+
+  Future<String> _runOpenSslPrint(List<String> args) async {
+    final result = await Process.run(opensslPath, args);
+    if (result.exitCode != 0) {
+      throw Exception(
+        'OpenSSL ${args.first} failed: ${result.stderr}',
+      );
+    }
+    return _combinedOutput(result);
+  }
+
+  String _combinedOutput(ProcessResult result) {
+    final out = (result.stdout as String?) ?? '';
+    final err = (result.stderr as String?) ?? '';
+    if (out.trim().isNotEmpty) return out;
+    return err;
+  }
+
+  bool _hasRecipientData(String cmsPrintOutput) {
+    return cmsPrintOutput.contains('d.ktri:') ||
+        cmsPrintOutput.contains('d.kari:') ||
+        cmsPrintOutput.contains('recipientInfo:') ||
+        cmsPrintOutput.contains('issuerAndSerialNumber:') ||
+        cmsPrintOutput.contains('subjectKeyIdentifier:');
+  }
+
+  /// Exports the extracted PKCS#7 PEM blob to DER for binary recipient parsing.
+  Future<Uint8List?> _extractPkcs7Der(_TempFiles tmp, String pkcs7PemPath) async {
+    final derPath = tmp.path('extracted.pkcs7.der');
+    final result = await Process.run(opensslPath, [
+      'cms',
+      '-inform',
+      'PEM',
+      '-in',
+      pkcs7PemPath,
+      '-outform',
+      'DER',
+      '-cmsout',
+      '-out',
+      derPath,
+    ]);
+    if (result.exitCode != 0) return null;
+    try {
+      return await tmp.read('extracted.pkcs7.der');
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Key / certificate inspection ───────────────────────────────────────────
 
   /// Parses an X.509 PEM [certificate] and returns structured metadata.
@@ -412,10 +548,19 @@ class SmimeOpensslEngine {
         ).firstMatch(sha1Line)?.group(1)?.trim() ??
         '';
 
+    final skiRaw = RegExp(
+      r'X509v3 Subject Key Identifier:\s*\n\s*([0-9a-fA-F:]+)',
+      multiLine: true,
+    ).firstMatch(text)?.group(1)?.trim();
+    final subjectKeyIdentifier = skiRaw == null || skiRaw.isEmpty
+        ? null
+        : SmimeCertId.normalize(skiRaw);
+
     return SmimePublicKeyMetadata(
       subjectDn: subjectDn,
       issuerDn: issuerDn,
       serialNumber: serialNumber,
+      subjectKeyIdentifier: subjectKeyIdentifier,
       validFrom: _parseX509Date(notBefore),
       validTo: _parseX509Date(notAfter),
       emailAddress: emailAddress,

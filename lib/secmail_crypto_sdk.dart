@@ -8,6 +8,7 @@
 export 'src/core/contracts/i_crypto_provider.dart';
 export 'src/core/contracts/i_execution_strategy.dart';
 export 'src/core/contracts/i_key_inspection_provider.dart';
+export 'src/core/contracts/i_message_inspection_provider.dart';
 export 'src/core/contracts/i_storage_provider.dart';
 export 'src/core/contracts/i_certificate_signing_service.dart';
 
@@ -15,6 +16,7 @@ export 'src/core/contracts/i_certificate_signing_service.dart';
 export 'src/core/models/crypto_algorithm.dart';
 export 'src/core/models/crypto_key.dart';
 export 'src/core/models/key_generation_params.dart';
+export 'src/core/models/encrypted_message_metadata.dart';
 export 'src/core/models/key_metadata.dart';
 export 'src/core/models/key_type.dart';
 export 'src/core/models/signature_verification_result.dart';

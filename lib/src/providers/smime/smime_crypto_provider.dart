@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import '../../core/contracts/i_certificate_signing_service.dart';
 import '../../core/contracts/i_crypto_provider.dart';
 import '../../core/contracts/i_key_inspection_provider.dart';
+import '../../core/contracts/i_message_inspection_provider.dart';
+import '../../core/models/encrypted_message_metadata.dart';
 import '../../core/exceptions/crypto_exceptions.dart';
 import '../../core/logging/crypto_logger.dart';
 import '../../core/models/crypto_algorithm.dart';
@@ -30,7 +32,8 @@ import 'openssl/smime_openssl_engine.dart';
 /// To enable S/MIME signature chain validation, set
 /// [CryptoKey.metadata]['caCertificate'] = CA PEM bytes on the sender's public
 /// key before calling [verify].
-class SmimeCryptoProvider implements ICryptoProvider, IKeyInspectionProvider {
+class SmimeCryptoProvider
+    implements ICryptoProvider, IKeyInspectionProvider, IMessageInspectionProvider {
   final SmimeOpensslEngine _engine;
   final SmimeCertificateGenerator _certGen;
   final CryptoLogger _log;
@@ -277,6 +280,30 @@ class SmimeCryptoProvider implements ICryptoProvider, IKeyInspectionProvider {
       _log.error('S/MIME getPrivateKeyMetadata failed', e);
       throw CryptoOperationException(
         'S/MIME getPrivateKeyMetadata failed: $e',
+        algorithm: algorithm,
+        cause: e,
+      );
+    }
+  }
+
+  // ── Message inspection ─────────────────────────────────────────────────────
+
+  /// Parses [ciphertext] and returns [SmimeEncryptedMessageMetadata].
+  ///
+  /// Extracts all CMS recipient info records (issuer/serial, SKI, key
+  /// encryption algorithm, etc.) without decrypting the message.
+  @override
+  Future<SmimeEncryptedMessageMetadata> parseEncryptedMessage(
+    Uint8List ciphertext,
+  ) async {
+    try {
+      return await _engine.parseEncryptedMessage(ciphertext);
+    } on CryptoArgumentException {
+      rethrow;
+    } catch (e) {
+      _log.error('S/MIME parseEncryptedMessage failed', e);
+      throw CryptoOperationException(
+        'S/MIME parseEncryptedMessage failed: $e',
         algorithm: algorithm,
         cause: e,
       );
