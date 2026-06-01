@@ -18,7 +18,9 @@ class SmimeMessageParser {
     String? mimeText,
     Uint8List? pkcs7Der,
   }) {
-    final mimeHeaders = mimeText == null ? const _MimeHeaders() : _parseMime(mimeText);
+    final mimeHeaders = mimeText == null
+        ? const _MimeHeaders()
+        : _parseMime(mimeText);
     final cmsContentType = _firstMatch(
       cmsPrintOutput,
       RegExp(r'contentType:\s*(\S+)', caseSensitive: false),
@@ -48,8 +50,9 @@ class SmimeMessageParser {
       smimeType: mimeHeaders.smimeType,
       recipients: recipients,
       contentEncryptionAlgorithm: contentEncryptionAlgorithm,
-      contentEncryptionKeyLength:
-          _keyLengthFromAlgorithm(contentEncryptionAlgorithm),
+      contentEncryptionKeyLength: _keyLengthFromAlgorithm(
+        contentEncryptionAlgorithm,
+      ),
     );
   }
 
@@ -57,9 +60,7 @@ class SmimeMessageParser {
     var entries = <SmimeRecipientInfoEntry>[];
 
     entries.addAll(_splitSections(text, 'd.ktri:').map(_parseKtriBlock));
-    entries.addAll(
-      _splitSections(text, 'd.kari:').expand(_parseKariBlock),
-    );
+    entries.addAll(_splitSections(text, 'd.kari:').expand(_parseKariBlock));
 
     if (entries.isEmpty) {
       for (final block in _splitSections(text, 'recipientInfo:')) {
@@ -98,13 +99,15 @@ class SmimeMessageParser {
                     issuerDn: der.issuerDn ?? textEntries.first.issuerDn,
                     serialNumber:
                         der.serialNumber ?? textEntries.first.serialNumber,
-                    subjectKeyIdentifier: der.subjectKeyIdentifier ??
+                    subjectKeyIdentifier:
+                        der.subjectKeyIdentifier ??
                         textEntries.first.subjectKeyIdentifier,
-                    keyEncryptionAlgorithm: der.keyEncryptionAlgorithm ??
+                    keyEncryptionAlgorithm:
+                        der.keyEncryptionAlgorithm ??
                         textEntries.first.keyEncryptionAlgorithm,
                     encryptedKeyLength:
                         textEntries.first.encryptedKeyLength ??
-                            der.encryptedKeyLength,
+                        der.encryptedKeyLength,
                   )
                 : der,
           )

@@ -234,13 +234,19 @@ class SmimeOpensslEngine {
       final smimePath = tmp.path('encrypted_data.p7m');
 
       final cmsPrintOutput = await _obtainCmsPrintOutput(tmp, smimePath);
-      final pkcs7Der = await _extractPkcs7Der(tmp, tmp.path('extracted.pkcs7.pem'));
+      final pkcs7Der = await _extractPkcs7Der(
+        tmp,
+        tmp.path('extracted.pkcs7.pem'),
+      );
 
       return SmimeMessageParser.parse(
         cmsPrintOutput: cmsPrintOutput,
         mimeText: smime,
         pkcs7Der: pkcs7Der,
       );
+    } catch (e) {
+      print('Error parsing S/MIME message: $e');
+      rethrow;
     } finally {
       await _safeCleanup(tmp, tag: 'parseEncryptedMessage');
     }
@@ -306,9 +312,7 @@ class SmimeOpensslEngine {
   Future<String> _runOpenSslPrint(List<String> args) async {
     final result = await Process.run(opensslPath, args);
     if (result.exitCode != 0) {
-      throw Exception(
-        'OpenSSL ${args.first} failed: ${result.stderr}',
-      );
+      throw Exception('OpenSSL ${args.first} failed: ${result.stderr}');
     }
     return _combinedOutput(result);
   }
@@ -329,7 +333,10 @@ class SmimeOpensslEngine {
   }
 
   /// Exports the extracted PKCS#7 PEM blob to DER for binary recipient parsing.
-  Future<Uint8List?> _extractPkcs7Der(_TempFiles tmp, String pkcs7PemPath) async {
+  Future<Uint8List?> _extractPkcs7Der(
+    _TempFiles tmp,
+    String pkcs7PemPath,
+  ) async {
     final derPath = tmp.path('extracted.pkcs7.der');
     final result = await Process.run(opensslPath, [
       'cms',
