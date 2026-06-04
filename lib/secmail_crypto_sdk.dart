@@ -33,11 +33,19 @@ export 'src/execution/direct_execution_strategy.dart';
 export 'src/execution/isolate_config.dart';
 export 'src/execution/isolate_execution_strategy.dart';
 
-// ── Built-in storage backend ───────────────────────────────────────────────
-export 'src/storage/flutter_secure_storage_provider.dart';
+// ── Built-in storage (pure Dart) ───────────────────────────────────────────
+export 'src/storage/in_memory_storage_provider.dart';
 
-// ── Built-in provider adapters ─────────────────────────────────────────────
-export 'src/providers/openpgp/openpgp_crypto_provider.dart';
+// ── OpenPGP message parser (pure Dart; crypto ops in secmail_crypto_flutter) ─
+export 'src/providers/openpgp/parsing/openpgp_message_parser.dart';
+
+// ── Pubkey server helpers (no HTTP — see secmail_pubkey_sdk) ───────────────
+export 'src/pubkey_support/algorithm_names.dart';
+export 'src/pubkey_support/body_hash.dart';
+export 'src/pubkey_support/encoding.dart';
+export 'src/pubkey_support/payload_signer.dart';
+
+// ── Built-in provider (S/MIME; OpenPGP via secmail_crypto_flutter) ─────────
 export 'src/providers/smime/smime_crypto_provider.dart';
 
 // ── Private key protection (PBKDF2 + AES-256-GCM backup cipher) ───────────

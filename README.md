@@ -1,7 +1,16 @@
 # secmail_crypto_sdk
 
-A standalone, self-contained Flutter package providing OpenPGP and S/MIME
-cryptographic operations through a unified, provider-based API.
+Pure Dart crypto: S/MIME, OpenPGP **parsing**, pubkey signing helpers.
+
+- **OpenPGP encrypt/sign:** add [`secmail_crypto_flutter`](packages/secmail_crypto_flutter) (`SecmailCryptoFlutter.initialize()`).
+- **HTTP / pubkey server:** [`scomm-ai/sdk_pubkey`](../../scomm-ai/sdk_pubkey).
+
+See [ARCHITECTURE.md](ARCHITECTURE.md).
+
+```bash
+dart pub get
+dart test
+```
 
 ## Features
 
@@ -154,7 +163,7 @@ secmail_crypto_sdk.dart  (barrel — public API)
 | Package | Purpose |
 |---------|---------|
 | `openpgp` | OpenPGP FFI / platform channels |
-| `flutter_secure_storage` | Default secure key-value storage |
+| [`fl-start/flutter_secure_storage`](https://github.com/fl-start/flutter_secure_storage) | Secure key-value storage (via `secmail_crypto_flutter`) |
 | `cryptography` | Available for future providers |
 | `crypto` | Available for future providers |
 

@@ -245,7 +245,7 @@ class SmimeOpensslEngine {
         pkcs7Der: pkcs7Der,
       );
     } catch (e) {
-      print('Error parsing S/MIME message: $e');
+      _log.warning('Error parsing S/MIME message', e);
       rethrow;
     } finally {
       await _safeCleanup(tmp, tag: 'parseEncryptedMessage');

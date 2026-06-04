@@ -1,11 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:openpgp/openpgp.dart';
+import 'package:test/test.dart';
 import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
-
-import 'package:secmail_crypto_sdk/src/providers/openpgp/parsing/openpgp_message_parser.dart';
 
 /// Builds a new-format OpenPGP packet with a single-byte body length.
 Uint8List _packet(int tag, Uint8List body) {
@@ -185,138 +182,6 @@ void main() {
         () => OpenPgpMessageParser.parse(utf8.encode('not a pgp message')),
         throwsA(isA<CryptoArgumentException>()),
       );
-    });
-  });
-
-  group('OpenPgpCryptoProvider.parseEncryptedMessage', () {
-    late OpenPgpCryptoProvider provider;
-
-    setUp(() {
-      provider = OpenPgpCryptoProvider();
-    });
-
-    tearDown(() async {
-      await provider.shutdown();
-    });
-
-    test('delegates to parser for synthetic ciphertext', () async {
-      const keyId = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
-      final binary = _syntheticEncryptedMessage(
-        keyIdBytes: keyId,
-        publicKeyAlgorithm: 18,
-      );
-
-      final meta = await provider.parseEncryptedMessage(binary);
-
-      expect(meta, isA<OpenPgpEncryptedMessageMetadata>());
-      expect(meta.recipientKeyIds, ['1122334455667788']);
-      expect(meta.pkesks.single.keyIdShort, '55667788');
-    });
-  });
-
-  group('CryptoSdk.getRecipientKeyIds', () {
-    late CryptoSdk sdk;
-    late OpenPgpCryptoProvider openPgpProvider;
-
-    setUp(() async {
-      openPgpProvider = OpenPgpCryptoProvider(poolSize: 1);
-      sdk = CryptoSdk.initialize(
-        CryptoSdkConfig(providers: [openPgpProvider]),
-      );
-      await openPgpProvider.ensureInitialized();
-    });
-
-    tearDown(() async {
-      await openPgpProvider.shutdown();
-      CryptoSdk.reset();
-    });
-
-    test('returns all keyIds for multi-recipient synthetic message', () async {
-      final pkesk1 = _packet(
-        1,
-        Uint8List.fromList([0x03, ...List.filled(8, 0xAA), 0x01, 0x01]),
-      );
-      final pkesk2 = _packet(
-        1,
-        Uint8List.fromList([0x03, ...List.filled(8, 0xBB), 18, 0x02]),
-      );
-      final seipd = _packet(18, Uint8List.fromList([0x01, 0x07, 0x00]));
-      final binary = Uint8List.fromList([...pkesk1, ...pkesk2, ...seipd]);
-
-      final keyIds = await sdk.getRecipientKeyIds(ciphertext: binary);
-
-      expect(keyIds, ['AAAAAAAAAAAAAAAA', 'BBBBBBBBBBBBBBBB']);
-    });
-  });
-
-  group('CryptoSdk.parseEncryptedMessage integration', () {
-    late CryptoSdk sdk;
-    late OpenPgpCryptoProvider openPgpProvider;
-
-    setUp(() async {
-      openPgpProvider = OpenPgpCryptoProvider(poolSize: 1);
-      sdk = CryptoSdk.initialize(
-        CryptoSdkConfig(providers: [openPgpProvider]),
-      );
-      await openPgpProvider.ensureInitialized();
-    });
-
-    tearDown(() async {
-      await openPgpProvider.shutdown();
-      CryptoSdk.reset();
-    });
-
-    test('extracts PKESK from a real OpenPGP encrypted message', () async {
-      try {
-        await OpenPGP.generate(
-          options: Options()
-            ..name = 'Probe'
-            ..email = 'probe@example.com'
-            ..passphrase = 'probe',
-        );
-      } catch (_) {
-        // Native OpenPGP bridge not built (e.g. unit-test without flutter run).
-        return;
-      }
-
-      const passphrase = 'parse-test-passphrase';
-      const email = 'parse-test@example.com';
-
-      final pair = await sdk.generateKeyPair(
-        algorithm: CryptoAlgorithm.openPgp,
-        params: const PgpKeyGenerationParams(
-          name: 'Parse Test',
-          email: email,
-          passphrase: passphrase,
-        ),
-      );
-
-      final pubMeta = await sdk.getPublicKeyMetadata(key: pair.publicKey);
-      expect(pubMeta, isA<OpenPgpPublicKeyMetadata>());
-      final pub = pubMeta as OpenPgpPublicKeyMetadata;
-
-      final ciphertext = await sdk.encrypt(
-        plaintext: Uint8List.fromList(utf8.encode('hello parse test')),
-        recipientPublicKeys: [pair.publicKey],
-      );
-
-      final parsed = await sdk.parseEncryptedMessage(
-        ciphertext: ciphertext,
-        algorithm: CryptoAlgorithm.openPgp,
-      );
-
-      expect(parsed, isA<OpenPgpEncryptedMessageMetadata>());
-      final meta = parsed as OpenPgpEncryptedMessageMetadata;
-      expect(meta.armorType, 'MESSAGE');
-      expect(meta.pkesks, isNotEmpty);
-      expect(
-        pub.allKeyIds,
-        contains(meta.pkesks.first.keyId),
-        reason: 'PKESK keyId must match primary or subkey',
-      );
-      expect(meta.pkesks.first.version, 3);
-      expect(meta.symmetricCipherAlgorithm, isNotNull);
-      expect(meta.packetTags, contains(1));
     });
   });
 }

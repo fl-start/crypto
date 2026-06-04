@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:math';
 
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 
-import '../../../core/logging/crypto_logger.dart';
+import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
 import 'openpgp_op.dart';
 
 /// Persistent pool of OpenPGP worker isolates.

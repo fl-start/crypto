@@ -2,20 +2,10 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:openpgp/openpgp.dart';
+import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
+import 'package:secmail_crypto_sdk/src/providers/openpgp/parsing/openpgp_message_parser.dart';
 
-import '../../core/contracts/i_crypto_provider.dart';
-import '../../core/contracts/i_key_inspection_provider.dart';
-import '../../core/contracts/i_message_inspection_provider.dart';
-import '../../core/models/encrypted_message_metadata.dart';
-import '../../core/exceptions/crypto_exceptions.dart';
-import '../../core/logging/crypto_logger.dart';
-import '../../core/models/crypto_algorithm.dart';
-import '../../core/models/crypto_key.dart';
-import '../../core/models/key_generation_params.dart';
-import '../../core/models/key_metadata.dart';
-import '../../core/models/key_type.dart';
-import '../../core/models/signature_verification_result.dart';
-import 'parsing/openpgp_message_parser.dart';
+import '../../pgp_key_generation_params.dart';
 import 'worker/openpgp_op.dart';
 import 'worker/openpgp_worker_pool.dart';
 

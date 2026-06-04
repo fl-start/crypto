@@ -16,9 +16,8 @@ import '../core/models/key_metadata.dart';
 import '../core/models/key_type.dart';
 import '../core/models/signature_verification_result.dart';
 import '../core/registry/provider_registry.dart';
-import '../providers/openpgp/openpgp_crypto_provider.dart';
 import '../providers/smime/smime_crypto_provider.dart';
-import '../storage/flutter_secure_storage_provider.dart';
+import '../storage/in_memory_storage_provider.dart';
 import 'crypto_sdk_config.dart';
 
 /// The single entry point for all SDK cryptographic operations.
@@ -64,7 +63,7 @@ class CryptoSdk {
     config ??= const CryptoSdkConfig();
     final logger = CryptoLogger(config.onLog);
     final registry = ProviderRegistry();
-    final storage = config.storageProvider ?? FlutterSecureStorageProvider();
+    final storage = config.storageProvider ?? InMemoryStorageProvider();
 
     final startupProviders = config.providers.isNotEmpty
         ? config.providers
@@ -96,7 +95,6 @@ class CryptoSdk {
     required CryptoLogger logger,
   }) {
     return [
-      OpenPgpCryptoProvider(poolSize: config.openPgpPoolSize, logger: logger),
       SmimeCryptoProvider(opensslPath: config.smimeOpenSslPath, logger: logger),
     ];
   }
@@ -384,7 +382,6 @@ class CryptoSdk {
       ciphertext: ciphertext,
       algorithm: CryptoAlgorithm.smime,
     );
-    print("getRecipientCertIds: ${parsed.toMap()}");
     return switch (parsed) {
       SmimeEncryptedMessageMetadata meta => meta.recipientCertIds,
       _ => const [],

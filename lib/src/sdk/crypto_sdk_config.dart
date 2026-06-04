@@ -12,11 +12,9 @@ import '../execution/direct_execution_strategy.dart';
 /// ```dart
 /// final sdk = CryptoSdk.initialize(
 ///   CryptoSdkConfig(
-///     storageProvider: FlutterSecureStorageProvider(),
-///     providers: [
-///       OpenPgpCryptoProvider(poolSize: 2),
-///       SmimeCryptoProvider(),
-///     ],
+///     storageProvider: InMemoryStorageProvider(),
+///     providers: [SmimeCryptoProvider()],
+/// // Flutter apps: use SecmailCryptoFlutter.initialize() from secmail_crypto_flutter.
 ///     onLog: (level, msg, [err]) => print('[$level] $msg ${err ?? ''}'),
 ///   ),
 /// );
@@ -24,7 +22,7 @@ import '../execution/direct_execution_strategy.dart';
 class CryptoSdkConfig {
   /// Backend for SDK-managed key-pair storage.
   ///
-  /// When null, [CryptoSdk.initialize] uses [FlutterSecureStorageProvider].
+  /// When null, [CryptoSdk.initialize] uses [InMemoryStorageProvider].
   final ISecureStorageProvider? storageProvider;
 
   /// Strategy used when the SDK dispatches crypto work on behalf of a provider.
@@ -44,7 +42,7 @@ class CryptoSdkConfig {
   /// Enabled by default to keep consumer setup minimal.
   final bool autoRegisterBuiltInProviders;
 
-  /// Worker pool size used when the SDK auto-creates [OpenPgpCryptoProvider].
+  /// OpenPGP worker pool size (used by [SecmailCryptoFlutter] in the Flutter addon).
   final int openPgpPoolSize;
 
   /// `openssl` executable path used when the SDK auto-creates

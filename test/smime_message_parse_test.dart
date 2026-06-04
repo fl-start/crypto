@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
 
 import 'package:secmail_crypto_sdk/src/providers/smime/parsing/smime_message_parser.dart';

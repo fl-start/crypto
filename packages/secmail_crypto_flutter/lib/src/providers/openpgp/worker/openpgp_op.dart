@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:openpgp/model/bridge_model_generated.dart' as model;
 import 'package:openpgp/openpgp.dart';

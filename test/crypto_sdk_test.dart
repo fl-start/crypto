@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
+
+class _TestKeyGenParams extends KeyGenerationParams {
+  const _TestKeyGenParams();
+}
 
 // ── In-memory storage provider for tests ──────────────────────────────────
 
@@ -157,8 +161,8 @@ void main() {
         CryptoSdkConfig(storageProvider: _InMemoryStorageProvider()),
       );
 
-      expect(sdk.hasProvider(CryptoAlgorithm.openPgp), isTrue);
       expect(sdk.hasProvider(CryptoAlgorithm.smime), isTrue);
+      expect(sdk.hasProvider(CryptoAlgorithm.openPgp), isFalse);
     });
   });
 
@@ -286,11 +290,7 @@ void main() {
     test('generateKeyPair returns a CryptoKeyPair', () async {
       final pair = await sdk.generateKeyPair(
         algorithm: CryptoAlgorithm.openPgp,
-        params: PgpKeyGenerationParams(
-          name: 'Test User',
-          email: 'test@example.com',
-          passphrase: 'secret',
-        ),
+        params: const _TestKeyGenParams(),
       );
       expect(pair.publicKey.type, KeyType.publicKey);
       expect(pair.privateKey.type, KeyType.privateKey);
@@ -339,11 +339,7 @@ void main() {
       sdk = _makeSdk(providers: [_StubCryptoProvider(CryptoAlgorithm.openPgp)]);
       pair = await sdk.generateKeyPair(
         algorithm: CryptoAlgorithm.openPgp,
-        params: PgpKeyGenerationParams(
-          name: 'Alice',
-          email: 'alice@example.com',
-          passphrase: 'p@ss',
-        ),
+        params: const _TestKeyGenParams(),
       );
     });
 
