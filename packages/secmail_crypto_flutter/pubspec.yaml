@@ -10,26 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # fl-start fork: path when monorepo is checked out; use git tag in CI without sibling clone.
   flutter_secure_storage:
-    path: ../../../flutter_secure_storage/flutter_secure_storage
+    git:
+      url: https://github.com/fl-start/flutter_secure_storage.git
+      ref: develop
+      path: flutter_secure_storage
   openpgp: ^3.10.7
   secmail_crypto_sdk:
     path: ../..
-
-dependency_overrides:
-  flutter_secure_storage:
-    path: ../../../flutter_secure_storage/flutter_secure_storage
-  flutter_secure_storage_darwin:
-    path: ../../../flutter_secure_storage/flutter_secure_storage_darwin
-  flutter_secure_storage_linux:
-    path: ../../../flutter_secure_storage/flutter_secure_storage_linux
-  flutter_secure_storage_platform_interface:
-    path: ../../../flutter_secure_storage/flutter_secure_storage_platform_interface
-  flutter_secure_storage_web:
-    path: ../../../flutter_secure_storage/flutter_secure_storage_web
-  flutter_secure_storage_windows:
-    path: ../../../flutter_secure_storage/flutter_secure_storage_windows
 
 dev_dependencies:
   flutter_lints: ^6.0.0
