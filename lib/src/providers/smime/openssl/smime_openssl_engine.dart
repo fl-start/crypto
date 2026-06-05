@@ -168,6 +168,45 @@ class SmimeOpensslEngine {
     return result;
   }
 
+  /// Detached RSA-SHA256 (PKCS#1 v1.5) signature over [data].
+  ///
+  /// Used for pubkey server upload proofs and `X-Auth-Signature` when
+  /// `sigAlgorithm` is `smime`. Returns raw signature bytes; callers must
+  /// base64url-encode (see [encodeBase64Url] in pubkey_support).
+  Future<Uint8List> signDetachedRsaSha256({
+    required Uint8List data,
+    required Uint8List privateKey,
+  }) async {
+    final tmp = await _TempFiles.create();
+    Uint8List? result;
+    try {
+      await tmp.write('data.bin', data);
+      await tmp.write('private_key.pem', privateKey);
+
+      final processResult = await Process.run(opensslPath, [
+        'dgst',
+        '-sha256',
+        '-sign',
+        tmp.path('private_key.pem'),
+        '-out',
+        tmp.path('sig.bin'),
+        tmp.path('data.bin'),
+      ]);
+
+      if (processResult.exitCode != 0) {
+        throw Exception(
+          'OpenSSL detached RSA-SHA256 sign failed: ${processResult.stderr}',
+        );
+      }
+
+      result = await tmp.read('sig.bin');
+    } finally {
+      _log.debug('S/MIME detached sign: cleaning up ${tmp.dir.path}');
+      await _safeCleanup(tmp, tag: 'signDetachedRsaSha256');
+    }
+    return result;
+  }
+
   // ── Verification ───────────────────────────────────────────────────────────
 
   /// Verifies an S/MIME [signature] over [data].

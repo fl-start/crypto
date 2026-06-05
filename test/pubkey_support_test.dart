@@ -22,4 +22,21 @@ void main() {
       expect(h1.length, 64);
     });
   });
+
+  group('pubkey_support auth payload', () {
+    test('encodeJsonBase64Url produces unpadded base64url', () {
+      final encoded = encodeJsonBase64Url({
+        'email': 'user@example.com',
+        'method': 'GET',
+        'path': '/keys',
+        'bodyHash': 'abc',
+        'timestamp': 1,
+        'jti': 'jti-1',
+        'sigAlgorithm': 'openpgp',
+      });
+      expect(encoded.contains('='), isFalse);
+      expect(encoded.contains('+'), isFalse);
+      expect(encoded.contains('/'), isFalse);
+    });
+  });
 }

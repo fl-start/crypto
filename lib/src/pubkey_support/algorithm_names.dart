@@ -3,7 +3,9 @@
 /// Used by [secmail_pubkey_sdk] when uploading keys or building signed requests.
 abstract final class PubkeyAlgorithmNames {
   static const openPgpEd25519 = 'openpgp-ed25519';
+  static const openPgpEd448 = 'openpgp-ed448';
   static const openPgpCv25519 = 'openpgp-cv25519';
+  static const openPgpCv448 = 'openpgp-cv448';
   static const smimeRsaSha256 = 'smime-rsa-sha256';
 
   /// Default signing algorithm for OpenPGP keys generated with [PgpKeyOptions] defaults.

@@ -40,10 +40,14 @@ export 'src/storage/in_memory_storage_provider.dart';
 export 'src/providers/openpgp/parsing/openpgp_message_parser.dart';
 
 // ── Pubkey server helpers (no HTTP — see secmail_pubkey_sdk) ───────────────
+export 'src/pubkey_support/algorithm_catalog.dart';
 export 'src/pubkey_support/algorithm_names.dart';
 export 'src/pubkey_support/body_hash.dart';
+export 'src/pubkey_support/decrypt_challenge.dart';
 export 'src/pubkey_support/encoding.dart';
+export 'src/pubkey_support/key_mapper.dart';
 export 'src/pubkey_support/payload_signer.dart';
+export 'src/pubkey_support/upload_support.dart';
 
 // ── Built-in provider (S/MIME; OpenPGP via secmail_crypto_flutter) ─────────
 export 'src/providers/smime/smime_crypto_provider.dart';

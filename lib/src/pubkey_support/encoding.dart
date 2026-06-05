@@ -1,7 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Base64url without padding (pubkey server auth headers and signatures).
+/// Pubkey wire encoding: **base64url without padding** everywhere.
+///
+/// Used for `X-Auth-Payload`, `X-Auth-Signature`, upload `signature`,
+/// `challengeResponse`, `ciphertext`, and FetchToken segments on both
+/// client and server.
+
+/// Base64url without padding (pubkey auth headers and signatures).
 String encodeBase64Url(Uint8List bytes) {
   return base64Url.encode(bytes).replaceAll('=', '');
 }
