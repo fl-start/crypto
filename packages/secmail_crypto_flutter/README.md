@@ -19,6 +19,16 @@ import 'package:secmail_crypto_flutter/secmail_crypto_flutter.dart';
 final sdk = SecmailCryptoFlutter.initialize();
 ```
 
+### S/MIME native assets (OpenSSL libcrypto)
+
+S/MIME uses bundled OpenSSL **libcrypto** via the transitive `openssl` package (not the system `openssl` CLI). After `flutter pub get`, run once per machine / CI image:
+
+```bash
+dart run openssl:setup_prebuilts
+```
+
+Requires **Dart 3.10+** and **Flutter 3.38+** (Native Assets). App code does not import `openssl` directly.
+
 ### Desktop prerequisites
 
 | Platform | Requirement |

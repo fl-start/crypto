@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import '../core/models/crypto_algorithm.dart';
 import '../core/models/crypto_key.dart';
-import '../providers/smime/openssl/smime_openssl_engine.dart';
+import '../providers/smime/backend/i_smime_backend.dart';
+import '../providers/smime/backend/smime_libcrypto_backend.dart';
 import '../sdk/crypto_sdk_impl.dart';
 import 'algorithm_names.dart';
 import 'encoding.dart';
@@ -13,13 +14,11 @@ import 'encoding.dart';
 /// All signatures returned are **base64url without padding**, matching the
 /// pubkey server contract for OpenPGP, S/MIME, upload proofs, and HTTP auth.
 class PubkeyPayloadSigner {
-  PubkeyPayloadSigner(
-    this._sdk, {
-    String opensslPath = 'openssl',
-  }) : _smimeEngine = SmimeOpensslEngine(opensslPath: opensslPath);
+  PubkeyPayloadSigner(this._sdk, {ISmimeBackend? smimeBackend})
+    : _smimeBackend = smimeBackend ?? SmimeLibcryptoBackend();
 
   final CryptoSdk _sdk;
-  final SmimeOpensslEngine _smimeEngine;
+  final ISmimeBackend _smimeBackend;
 
   /// Signs the exact `X-Auth-Payload` header value (base64url JSON).
   ///
@@ -72,7 +71,7 @@ class PubkeyPayloadSigner {
     required Uint8List payloadBytes,
     required CryptoKey signingPrivateKey,
   }) async {
-    return _smimeEngine.signDetachedRsaSha256(
+    return _smimeBackend.signDetachedRsaSha256(
       data: payloadBytes,
       privateKey: signingPrivateKey.rawBytes,
     );

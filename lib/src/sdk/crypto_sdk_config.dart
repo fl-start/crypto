@@ -45,10 +45,6 @@ class CryptoSdkConfig {
   /// OpenPGP worker pool size (used by [SecmailCryptoFlutter] in the Flutter addon).
   final int openPgpPoolSize;
 
-  /// `openssl` executable path used when the SDK auto-creates
-  /// [SmimeCryptoProvider].
-  final String smimeOpenSslPath;
-
   /// Optional log callback. Receives all SDK lifecycle and error events.
   ///
   /// Set to null to silence all logging (the default).
@@ -60,7 +56,6 @@ class CryptoSdkConfig {
     this.providers = const [],
     this.autoRegisterBuiltInProviders = true,
     this.openPgpPoolSize = 1,
-    this.smimeOpenSslPath = 'openssl',
     this.onLog,
   });
 }

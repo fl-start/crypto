@@ -5,7 +5,9 @@ import 'dart:typed_data';
 import '../../../core/logging/crypto_logger.dart';
 import '../../../core/models/encrypted_message_metadata.dart';
 import '../../../core/models/key_metadata.dart';
+import '../backend/i_smime_backend.dart';
 import '../parsing/smime_message_parser.dart';
+import '../parsing/smime_text_helpers.dart';
 
 /// Low-level S/MIME operations backed by the system `openssl` CLI.
 ///
@@ -13,7 +15,7 @@ import '../parsing/smime_message_parser.dart';
 /// communicates via temporary files (as required by OpenSSL's CLI interface).
 /// All temp files are written to a unique system-temp sub-directory and
 /// deleted in a `finally` block regardless of success or failure.
-class SmimeOpensslEngine {
+class SmimeOpensslEngine implements ISmimeBackend {
   /// Path to the `openssl` binary. Defaults to `'openssl'` (resolved via PATH).
   final String opensslPath;
 
@@ -702,80 +704,6 @@ class SmimeOpensslEngine {
       }
     }
   }
-}
-
-// ── S/MIME text normalization helpers ─────────────────────────────────────
-
-/// Normalises line endings, removes trailing whitespace, and rebuilds the
-/// MIME message with exactly one blank line separating headers from body.
-///
-/// This produces the CRLF-delimited format that OpenSSL's S/MIME parser
-/// expects.
-String normalizeSmimeText(String input) {
-  // 1. Normalise line endings.
-  var s = input.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-
-  // 2. Strip trailing whitespace from each line.
-  s = s.split('\n').map((l) => l.trimRight()).join('\n');
-
-  // 3. Split at the first blank line (header / body boundary).
-  final parts = s.split(RegExp(r'\n\s*\n+'));
-  if (parts.length < 2) return input;
-
-  final headerLines = parts.first
-      .split('\n')
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
-
-  final bodyLines = parts
-      .sublist(1)
-      .join('\n')
-      .split('\n')
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
-
-  // 4. Rebuild with CRLF line endings and exactly one blank separator.
-  final rebuilt = [
-    ...headerLines,
-    '', // exactly one blank line
-    ...bodyLines,
-    '', // trailing newline
-  ].join('\r\n');
-
-  return rebuilt;
-}
-
-/// Ensures the text has proper S/MIME MIME headers.
-///
-/// If headers are already present, delegates to [normalizeSmimeText].
-/// Otherwise wraps the raw base64 payload in standard S/MIME headers.
-String ensureSmimeText(String input) {
-  final s = input.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
-
-  if (s.toLowerCase().contains('content-type:')) {
-    return normalizeSmimeText(s);
-  }
-
-  // Assume it is a bare PKCS#7 base64 blob.
-  final b64 = s.replaceAll(RegExp(r'[^A-Za-z0-9+/=]'), '');
-
-  // Wrap to 64-char lines (OpenSSL-friendly).
-  final lines = <String>[];
-  for (var i = 0; i < b64.length; i += 64) {
-    lines.add(b64.substring(i, (i + 64).clamp(0, b64.length)));
-  }
-
-  return [
-    'MIME-Version: 1.0',
-    'Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"',
-    'Content-Transfer-Encoding: base64',
-    'Content-Disposition: attachment; filename="smime.p7m"',
-    '',
-    ...lines,
-    '',
-  ].join('\r\n');
 }
 
 // ── Temp file management ───────────────────────────────────────────────────

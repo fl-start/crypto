@@ -13,15 +13,15 @@ import '../../core/models/key_generation_params.dart';
 import '../../core/models/key_metadata.dart';
 import '../../core/models/key_type.dart';
 import '../../core/models/signature_verification_result.dart';
-import 'openssl/smime_certificate_generator.dart';
-import 'openssl/smime_openssl_engine.dart';
+import 'backend/i_smime_backend.dart';
+import 'backend/smime_libcrypto_backend.dart';
+import 'backend/smime_libcrypto_cert_generator.dart';
 
 /// [ICryptoProvider] implementation for S/MIME (RSA 2048 / X.509).
 ///
-/// All cryptographic operations are delegated to [SmimeOpensslEngine], which
-/// shells out to the system `openssl` CLI via temporary files. Certificate
-/// generation is handled by [SmimeCertificateGenerator], which supports both
-/// CA-signed and self-signed certificates.
+/// All cryptographic operations are delegated to an internal [ISmimeBackend]
+/// (libcrypto via [package:openssl]). Certificate generation uses
+/// [SmimeLibcryptoCertGenerator].
 ///
 /// Key format conventions:
 ///   - Public key  → [CryptoKey.rawBytes] = PEM X.509 certificate bytes.
@@ -34,23 +34,22 @@ import 'openssl/smime_openssl_engine.dart';
 /// key before calling [verify].
 class SmimeCryptoProvider
     implements ICryptoProvider, IKeyInspectionProvider, IMessageInspectionProvider {
-  final SmimeOpensslEngine _engine;
-  final SmimeCertificateGenerator _certGen;
+  final ISmimeBackend _engine;
+  final SmimeLibcryptoCertGenerator _certGen;
   final CryptoLogger _log;
 
-  /// Creates an S/MIME provider.
+  /// Creates an S/MIME provider backed by bundled OpenSSL libcrypto.
   ///
-  /// [opensslPath] is the path to the `openssl` binary (default: `'openssl'`).
   /// [signingService] is an optional CA-signing integration for certificate
   /// generation. When null, self-signed certificates are always used.
   /// [logger] receives operational events.
+  /// [backend] is test-only; production uses [SmimeLibcryptoBackend].
   SmimeCryptoProvider({
-    String opensslPath = 'openssl',
     ICertificateSigningService? signingService,
     CryptoLogger logger = CryptoLogger.silent,
-  }) : _engine = SmimeOpensslEngine(opensslPath: opensslPath, logger: logger),
-       _certGen = SmimeCertificateGenerator(
-         opensslPath: opensslPath,
+    ISmimeBackend? backend,
+  }) : _engine = backend ?? SmimeLibcryptoBackend(logger: logger),
+       _certGen = SmimeLibcryptoCertGenerator(
          signingService: signingService,
          logger: logger,
        ),

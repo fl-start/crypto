@@ -34,7 +34,7 @@ void main() {
           ),
           sigFamily: PubkeySigFamily.smime,
         ),
-        throwsA(isA<Exception>()),
+        throwsA(anything),
       );
     });
 

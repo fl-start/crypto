@@ -4,11 +4,14 @@ version: 0.1.0
 publish_to: none
 
 environment:
-  sdk: ">=3.9.0 <4.0.0"
+  sdk: ">=3.10.0 <4.0.0"
 
 dependencies:
   cryptography: ^2.7.0
   crypto: ^3.0.7
+  ffi: ^2.1.4
+  openssl:
+    path: ../../advforks/openssl-dart
 
 dev_dependencies:
   lints: ^6.0.0

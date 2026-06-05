@@ -95,7 +95,7 @@ class CryptoSdk {
     required CryptoLogger logger,
   }) {
     return [
-      SmimeCryptoProvider(opensslPath: config.smimeOpenSslPath, logger: logger),
+      SmimeCryptoProvider(logger: logger),
     ];
   }
 

@@ -9,12 +9,11 @@ abstract final class SecmailCryptoFlutter {
   /// OpenPGP + S/MIME providers (same as legacy auto-register, minus storage).
   static List<ICryptoProvider> defaultProviders({
     int openPgpPoolSize = 1,
-    String smimeOpenSslPath = 'openssl',
     CryptoLogger logger = CryptoLogger.silent,
   }) {
     return [
       OpenPgpCryptoProvider(poolSize: openPgpPoolSize, logger: logger),
-      SmimeCryptoProvider(opensslPath: smimeOpenSslPath, logger: logger),
+      SmimeCryptoProvider(logger: logger),
     ];
   }
 
@@ -29,12 +28,10 @@ abstract final class SecmailCryptoFlutter {
           ? base.providers
           : defaultProviders(
               openPgpPoolSize: base.openPgpPoolSize,
-              smimeOpenSslPath: base.smimeOpenSslPath,
               logger: logger,
             ),
       autoRegisterBuiltInProviders: base.autoRegisterBuiltInProviders,
       openPgpPoolSize: base.openPgpPoolSize,
-      smimeOpenSslPath: base.smimeOpenSslPath,
       onLog: base.onLog,
     );
   }

@@ -9,6 +9,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 dart pub get
+dart run openssl:setup_prebuilts   # once: fetch libcrypto prebuilts for S/MIME FFI
 dart test
 ```
 
