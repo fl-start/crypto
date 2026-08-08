@@ -15,7 +15,10 @@ dependencies:
       url: https://github.com/fl-start/flutter_secure_storage.git
       ref: develop
       path: flutter_secure_storage
-  openpgp: ^3.10.7
+  openpgp:
+    git:
+      url: https://github.com/fl-start/flutter-openpgp
+      ref: fix/macos-spm-and-builtin-kotlin
   secmail_crypto_sdk:
     path: ../..
 
