@@ -14,6 +14,7 @@ import '../../core/models/key_metadata.dart';
 import '../../core/models/key_type.dart';
 import '../../core/models/signature_verification_result.dart';
 import 'backend/i_smime_backend.dart';
+import 'backend/openssl_ffi_helpers.dart' as smime_ffi;
 import 'backend/smime_libcrypto_backend.dart';
 import 'backend/smime_libcrypto_cert_generator.dart';
 
@@ -59,6 +60,14 @@ class SmimeCryptoProvider
   CryptoAlgorithm get algorithm => CryptoAlgorithm.smime;
 
   // ── Crypto operations ──────────────────────────────────────────────────────
+
+  Future<List<Uint8List>> extractCertificates(Uint8List cmsBytes) async {
+    final engine = _engine;
+    if (engine is SmimeLibcryptoBackend) {
+      return engine.extractCertificates(cmsBytes);
+    }
+    return const [];
+  }
 
   @override
   Future<Uint8List> encrypt({
@@ -319,6 +328,36 @@ class SmimeCryptoProvider
   }) async {
     // S/MIME does not use passphrases in this implementation.
   }
+
+  /// Converts a PEM or DER X.509 certificate to PEM.
+  Uint8List normalizeCertificateToPem(Uint8List bytes) =>
+      smime_ffi.normalizeCertificateToPem(bytes);
+
+  /// Converts a PEM or DER X.509 certificate to DER (Outlook `.cer`).
+  Uint8List certificateToDer(Uint8List pemOrDer) =>
+      smime_ffi.certificateToDer(pemOrDer);
+
+  /// Unpacks a PKCS#12 / PFX blob into PEM private key + certificate.
+  ({Uint8List privateKeyPem, Uint8List certificatePem}) unpackPkcs12({
+    required Uint8List pkcs12Bytes,
+    required String password,
+  }) => smime_ffi.unpackPkcs12(
+    pkcs12Bytes: pkcs12Bytes,
+    password: password,
+  );
+
+  /// Packs a PEM private key + certificate into PKCS#12 / PFX for Outlook.
+  Uint8List packPkcs12({
+    required Uint8List privateKeyPem,
+    required Uint8List certificatePem,
+    required String password,
+    String friendlyName = 'S/MIME',
+  }) => smime_ffi.packPkcs12(
+    privateKeyPem: privateKeyPem,
+    certificatePem: certificatePem,
+    password: password,
+    friendlyName: friendlyName,
+  );
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

@@ -83,6 +83,156 @@ Pointer<openssl.x509_st> readX509Pem(Uint8List pemBytes, Arena arena) {
   return cert;
 }
 
+bool looksLikePem(Uint8List bytes) {
+  final probeLen = bytes.length < 256 ? bytes.length : 256;
+  final probe = utf8.decode(bytes.sublist(0, probeLen), allowMalformed: true);
+  return probe.contains('-----BEGIN');
+}
+
+Pointer<openssl.x509_st> readX509PemOrDer(Uint8List bytes, Arena arena) {
+  if (looksLikePem(bytes)) {
+    try {
+      return readX509Pem(bytes, arena);
+    } catch (_) {
+      // Fall through to DER — some files wrap binary in text.
+    }
+  }
+  final bio = bioFromBytes(bytes, arena);
+  final cert = openssl.d2i_X509_bio(bio, nullptr);
+  if (cert == nullptr) {
+    throw StateError(
+      'Could not parse X.509 certificate as PEM or DER: ${opensslLastError()}',
+    );
+  }
+  return cert;
+}
+
+Uint8List x509ToPem(Pointer<openssl.x509_st> cert, Arena arena) {
+  final bio = newMemBio(arena);
+  opensslCheck(openssl.PEM_write_bio_X509(bio, cert), 'PEM_write_bio_X509 failed');
+  return readBio(bio, arena);
+}
+
+Uint8List x509ToDer(Pointer<openssl.x509_st> cert, Arena arena) {
+  final bio = newMemBio(arena);
+  opensslCheck(openssl.i2d_X509_bio(bio, cert), 'i2d_X509_bio failed');
+  return readBio(bio, arena);
+}
+
+Uint8List writePrivateKeyPem(
+  Pointer<openssl.evp_pkey_st> pkey,
+  Arena arena,
+) {
+  final bio = newMemBio(arena);
+  opensslCheck(
+    openssl.PEM_write_bio_PrivateKey(
+      bio,
+      pkey,
+      nullptr,
+      nullptr,
+      0,
+      nullptr,
+      nullptr,
+    ),
+    'PEM_write_bio_PrivateKey failed',
+  );
+  return readBio(bio, arena);
+}
+
+Uint8List normalizeCertificateToPem(Uint8List bytes) {
+  return using((arena) {
+    final cert = readX509PemOrDer(bytes, arena);
+    return x509ToPem(cert, arena);
+  });
+}
+
+Uint8List certificateToDer(Uint8List pemOrDer) {
+  return using((arena) {
+    final cert = readX509PemOrDer(pemOrDer, arena);
+    return x509ToDer(cert, arena);
+  });
+}
+
+({Uint8List privateKeyPem, Uint8List certificatePem}) unpackPkcs12({
+  required Uint8List pkcs12Bytes,
+  required String password,
+}) {
+  return using((arena) {
+    final bio = bioFromBytes(pkcs12Bytes, arena);
+    final p12 = openssl.d2i_PKCS12_bio(bio, nullptr);
+    opensslCheckNonNull(p12, 'd2i_PKCS12_bio failed');
+    try {
+      final pkeyPtr = arena<Pointer<openssl.evp_pkey_st>>();
+      final certPtr = arena<Pointer<openssl.x509_st>>();
+      pkeyPtr.value = nullptr;
+      certPtr.value = nullptr;
+      final passPtr = password.toNativeUtf8(allocator: arena);
+      opensslCheck(
+        openssl.PKCS12_parse(
+          p12,
+          passPtr.cast(),
+          pkeyPtr,
+          certPtr,
+          nullptr,
+        ),
+        'PKCS12_parse failed',
+      );
+      final pkey = pkeyPtr.value;
+      final cert = certPtr.value;
+      if (pkey == nullptr || cert == nullptr) {
+        throw StateError(
+          'PKCS#12 did not contain both a private key and a certificate',
+        );
+      }
+      try {
+        return (
+          privateKeyPem: writePrivateKeyPem(pkey, arena),
+          certificatePem: x509ToPem(cert, arena),
+        );
+      } finally {
+        openssl.EVP_PKEY_free(pkey);
+        openssl.X509_free(cert);
+      }
+    } finally {
+      openssl.PKCS12_free(p12);
+    }
+  });
+}
+
+Uint8List packPkcs12({
+  required Uint8List privateKeyPem,
+  required Uint8List certificatePem,
+  required String password,
+  String friendlyName = 'S/MIME',
+}) {
+  return using((arena) {
+    final pkey = readPrivateKeyPem(privateKeyPem, arena);
+    final cert = readX509PemOrDer(certificatePem, arena);
+    final passPtr = password.toNativeUtf8(allocator: arena);
+    final namePtr = friendlyName.toNativeUtf8(allocator: arena);
+    final p12 = openssl.PKCS12_create(
+      passPtr.cast(),
+      namePtr.cast(),
+      pkey,
+      cert,
+      nullptr,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    opensslCheckNonNull(p12, 'PKCS12_create failed');
+    try {
+      final bio = newMemBio(arena);
+      opensslCheck(openssl.i2d_PKCS12_bio(bio, p12), 'i2d_PKCS12_bio failed');
+      return readBio(bio, arena);
+    } finally {
+      openssl.PKCS12_free(p12);
+    }
+  });
+}
+
 Pointer<openssl.stack_st_X509> x509StackFromPems(
   List<Uint8List> certificates,
   Arena arena,

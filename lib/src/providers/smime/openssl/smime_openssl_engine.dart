@@ -9,12 +9,11 @@ import '../backend/i_smime_backend.dart';
 import '../parsing/smime_message_parser.dart';
 import '../parsing/smime_text_helpers.dart';
 
-/// Low-level S/MIME operations backed by the system `openssl` CLI.
+/// Test-only S/MIME backend that shells out to the system `openssl` CLI.
 ///
-/// This class shells out to the `openssl smime` family of sub-commands and
-/// communicates via temporary files (as required by OpenSSL's CLI interface).
-/// All temp files are written to a unique system-temp sub-directory and
-/// deleted in a `finally` block regardless of success or failure.
+/// Product code uses [SmimeLibcryptoBackend]. This class exists for parity
+/// tests (`test/smime_libcrypto_parity_test.dart`) and must not be wired
+/// into [SmimeCryptoProvider] or any application path.
 class SmimeOpensslEngine implements ISmimeBackend {
   /// Path to the `openssl` binary. Defaults to `'openssl'` (resolved via PATH).
   final String opensslPath;
@@ -174,7 +173,7 @@ class SmimeOpensslEngine implements ISmimeBackend {
   ///
   /// Used for pubkey server upload proofs and `X-Auth-Signature` when
   /// `sigAlgorithm` is `smime`. Returns raw signature bytes; callers must
-  /// base64url-encode (see [encodeBase64Url] in pubkey_support).
+  /// base64url-encode the digest for comparison in tests.
   Future<Uint8List> signDetachedRsaSha256({
     required Uint8List data,
     required Uint8List privateKey,

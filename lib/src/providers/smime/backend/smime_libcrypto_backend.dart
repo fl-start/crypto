@@ -54,19 +54,57 @@ class SmimeLibcryptoBackend implements ISmimeBackend {
     required Uint8List privateKey,
   }) async {
     return using((arena) {
-      final text = normalizeSmimeText(utf8.decode(encryptedData));
-      final smime = ensureSmimeText(text);
-      final inBio = bioFromBytes(Uint8List.fromList(utf8.encode(smime)), arena);
-      final cms = openssl.SMIME_read_CMS(inBio, nullptr);
-      opensslCheckNonNull(cms, 'SMIME_read_CMS failed');
+      final cms = _readCms(encryptedData, arena);
       try {
         final key = readPrivateKeyPem(privateKey, arena);
         final outBio = newMemBio(arena);
+        openssl.CMS_decrypt_set1_pkey(cms, key, nullptr);
         opensslCheck(
           openssl.CMS_decrypt(cms, key, nullptr, nullptr, outBio, 0),
           'CMS_decrypt failed',
         );
         return readBio(outBio, arena);
+      } finally {
+        openssl.CMS_ContentInfo_free(cms);
+      }
+    });
+  }
+
+  Pointer<openssl.CMS_ContentInfo_st> _readCms(
+    Uint8List encryptedData,
+    Arena arena,
+  ) {
+    if (encryptedData.isNotEmpty && encryptedData.first == 0x30) {
+      final derBio = bioFromBytes(encryptedData, arena);
+      final cms = openssl.d2i_CMS_bio(derBio, nullptr);
+      if (cms != nullptr) return cms;
+    }
+    final text = utf8.decode(encryptedData, allowMalformed: true);
+    final smime = ensureSmimeText(normalizeSmimeText(text));
+    final inBio = bioFromBytes(Uint8List.fromList(utf8.encode(smime)), arena);
+    final cms = openssl.SMIME_read_CMS(inBio, nullptr);
+    if (cms != nullptr) return cms;
+    final fallback = openssl.d2i_CMS_bio(bioFromBytes(encryptedData, arena), nullptr);
+    opensslCheckNonNull(fallback, 'Could not parse CMS (SMIME or DER)');
+    return fallback;
+  }
+
+  Future<List<Uint8List>> extractCertificates(Uint8List cmsBytes) async {
+    return using((arena) {
+      final cms = _readCms(cmsBytes, arena);
+      try {
+        final stack = openssl.CMS_get1_certs(cms);
+        if (stack == nullptr) return const <Uint8List>[];
+        final n = openssl.OPENSSL_sk_num(stack.cast());
+        final out = <Uint8List>[];
+        for (var i = 0; i < n; i++) {
+          final cert = openssl.OPENSSL_sk_value(stack.cast(), i).cast<openssl.x509_st>();
+          if (cert == nullptr) continue;
+          final bio = newMemBio(arena);
+          opensslCheck(openssl.PEM_write_bio_X509(bio, cert), 'PEM_write_bio_X509 failed');
+          out.add(readBio(bio, arena));
+        }
+        return out;
       } finally {
         openssl.CMS_ContentInfo_free(cms);
       }
@@ -226,7 +264,7 @@ class SmimeLibcryptoBackend implements ISmimeBackend {
   @override
   Future<SmimePublicKeyMetadata> parseCertificate(Uint8List certificate) async {
     return using((arena) {
-      final cert = readX509Pem(certificate, arena);
+      final cert = readX509PemOrDer(certificate, arena);
       final subjectDn =
           x509NameToString(openssl.X509_get_subject_name(cert), arena) ?? '';
       final issuerDn =
@@ -303,18 +341,25 @@ class SmimeLibcryptoBackend implements ISmimeBackend {
   String? _contentEncryptionFromDer(Uint8List? der) {
     if (der == null) return null;
     // AES-256-CBC (2.16.840.1.101.3.4.1.42) OID bytes in CMS EnvelopedData.
-    const aes256Cbc = [0x60, 0x86, 0x48, 0x01, 0x66, 0x03, 0x04, 0x01, 0x2a];
-    for (var i = 0; i <= der.length - aes256Cbc.length; i++) {
+    const aes256Cbc = [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2a];
+    const aes128Cbc = [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x02];
+    if (_derContains(der, aes256Cbc)) return 'aes-256-cbc';
+    if (_derContains(der, aes128Cbc)) return 'aes-128-cbc';
+    return null;
+  }
+
+  static bool _derContains(Uint8List der, List<int> needle) {
+    for (var i = 0; i <= der.length - needle.length; i++) {
       var match = true;
-      for (var j = 0; j < aes256Cbc.length; j++) {
-        if (der[i + j] != aes256Cbc[j]) {
+      for (var j = 0; j < needle.length; j++) {
+        if (der[i + j] != needle[j]) {
           match = false;
           break;
         }
       }
-      if (match) return 'aes-256-cbc';
+      if (match) return true;
     }
-    return null;
+    return false;
   }
 
   int? _keyLengthFromAlgorithm(String? algorithm) {

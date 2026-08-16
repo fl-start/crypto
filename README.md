@@ -1,6 +1,6 @@
 # secmail_crypto_sdk
 
-Pure Dart crypto: S/MIME, OpenPGP **parsing**, pubkey signing helpers.
+Pure Dart crypto: S/MIME and OpenPGP **parsing**. Pubkey protocol lives in sdk_pubkey.
 
 - **OpenPGP encrypt/sign:** add [`secmail_crypto_flutter`](packages/secmail_crypto_flutter) (`SecmailCryptoFlutter.initialize()`).
 - **HTTP / pubkey server:** [`scomm-ai/sdk_pubkey`](../../scomm-ai/sdk_pubkey).
