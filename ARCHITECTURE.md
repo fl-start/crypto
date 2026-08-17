@@ -1,8 +1,9 @@
 # Architecture
 
 This repo is **OpenPGP / S/MIME engines and secure storage**. The Pubkey
-protocol (MSK, Vault HTTP, `POST /v1/mutate`, discovery) lives in
-`sdk_pubkey` (`secmail_pubkey_sdk`). Do not implement enroll/mutate here.
+protocol (MSK, Vault HTTP, `POST /v1/mutate`, discovery) lives in the
+SComm adapters (`secmail_pubkey_sdk` in secMail0, `@scomm/pubkey` in Office).
+Do not implement enroll/mutate here.
 
 ## Packages
 
@@ -28,7 +29,7 @@ final sdk = SecmailCryptoFlutter.initialize();
 final vaultStore = FlutterSecureVaultStore();
 ```
 
-`FlutterSecureVaultStore` persists the **already encrypted** sdk_pubkey Vault
+`FlutterSecureVaultStore` persists the **already encrypted** Vault
 JSON under `scomm.vault.v1`. It does not hold raw private keys.
 
 ## Pubkey HTTP
