@@ -1,6 +1,6 @@
 # secmail_crypto_sdk
 
-Pure Dart crypto: S/MIME and OpenPGP **parsing**. Pubkey protocol lives in the SComm adapters, not here.
+Pure Dart crypto: OpenPGP **parsing** and SDK core. Pubkey protocol lives in the SComm adapters, not here.
 
 - **OpenPGP encrypt/sign:** add [`secmail_crypto_flutter`](packages/secmail_crypto_flutter) (`SecmailCryptoFlutter.initialize()`).
 - **HTTP / pubkey protocol:** Office `@scomm/pubkey` (JS) and secMail0 `packages/scomm_pubkey` (Dart). Vault format: [CKVF](https://github.com/Cryptographic-Key-Vault-Format/sdk-dart).
@@ -9,17 +9,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 dart pub get
-dart run openssl:setup_prebuilts   # once: fetch libcrypto prebuilts for S/MIME FFI
 dart test
 ```
 
 ## Features
 
-- OpenPGP encrypt, decrypt, sign, verify (EdDSA / Curve25519)
-- S/MIME encrypt, decrypt, sign, verify (RSA 2048 / X.509)
+- OpenPGP encrypt, decrypt, sign, verify (EdDSA / Curve25519) via `secmail_crypto_flutter`
 - Persistent OpenPGP worker-isolate pool (no per-call spawn overhead)
 - SDK-managed key-pair storage backed by `flutter_secure_storage`
-- Optional CA-signing integration for S/MIME certificate generation
 - Structured logging via a callback
 - Configurable execution strategy (inline or Dart isolate)
 
@@ -33,11 +30,9 @@ void main() async {
 
   final sdk = CryptoSdk.initialize(
     CryptoSdkConfig(
-      // Optional: when omitted, FlutterSecureStorageProvider is used.
-      // storageProvider: FlutterSecureStorageProvider(),
-      // Optional: when omitted, built-in OpenPGP and S/MIME providers
-      // are auto-registered.
-      // providers: [OpenPgpCryptoProvider(poolSize: 2), SmimeCryptoProvider()],
+      // Flutter apps: use SecmailCryptoFlutter.initialize() from secmail_crypto_flutter.
+      storageProvider: InMemoryStorageProvider(),
+      providers: [],
       onLog: (level, msg, [err]) => debugPrint('[$level] $msg ${err ?? ''}'),
     ),
   );
@@ -75,45 +70,6 @@ void main() async {
 }
 ```
 
-## S/MIME example
-
-```dart
-final sdk = CryptoSdk.initialize(
-  CryptoSdkConfig(
-    storageProvider: FlutterSecureStorageProvider(),
-    providers: [SmimeCryptoProvider()],
-  ),
-);
-
-final pair = await sdk.generateKeyPair(
-  algorithm: CryptoAlgorithm.smime,
-  params: SmimeKeyGenerationParams(
-    commonName: 'Bob Smith',
-    email: 'bob@example.com',
-  ),
-);
-```
-
-## CA-signed S/MIME certificates
-
-Implement `ICertificateSigningService` and pass it to `SmimeCryptoProvider`:
-
-```dart
-class MyCaService implements ICertificateSigningService {
-  @override
-  Future<String?> signCsr({
-    required String csrPem,
-    required String email,
-    required String commonName,
-  }) async {
-    final resp = await myApi.post('/sign-csr', {'csr': csrPem, 'email': email});
-    return resp['certificate'] as String?;
-  }
-}
-
-SmimeCryptoProvider(signingService: MyCaService())
-```
-
 ## Logging
 
 ```dart
@@ -146,16 +102,15 @@ secmail_crypto_sdk.dart  (barrel — public API)
 └── src/
     ├── core/
     │   ├── contracts/   ICryptoProvider, ISecureStorageProvider,
-    │   │                IExecutionStrategy, ICertificateSigningService
+    │   │                IExecutionStrategy
     │   ├── models/      CryptoKey, CryptoKeyPair, CryptoAlgorithm, ...
     │   ├── exceptions/  CryptoException (sealed) + subclasses
     │   ├── registry/    ProviderRegistry
     │   └── logging/     CryptoLogger, CryptoLogLevel, CryptoLogCallback
     ├── execution/       DirectExecutionStrategy, IsolateExecutionStrategy
-    ├── storage/         FlutterSecureStorageProvider
+    ├── storage/         InMemoryStorageProvider
     ├── providers/
-    │   ├── openpgp/     OpenPgpCryptoProvider + worker pool
-    │   └── smime/       SmimeCryptoProvider + OpenSSL engine + cert generator
+    │   └── openpgp/     OpenPGP message parser (crypto ops in Flutter addon)
     └── sdk/             CryptoSdk, CryptoSdkConfig
 ```
 
@@ -170,6 +125,4 @@ secmail_crypto_sdk.dart  (barrel — public API)
 
 ## Requirements
 
-- Dart SDK `>=3.9.0 <4.0.0`
-- Flutter `>=3.35.0`
-- `openssl` CLI available on PATH for S/MIME operations
+- Dart SDK `>=3.10.0 <4.0.0`

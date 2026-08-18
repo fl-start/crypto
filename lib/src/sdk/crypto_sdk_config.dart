@@ -13,7 +13,7 @@ import '../execution/direct_execution_strategy.dart';
 /// final sdk = CryptoSdk.initialize(
 ///   CryptoSdkConfig(
 ///     storageProvider: InMemoryStorageProvider(),
-///     providers: [SmimeCryptoProvider()],
+///     providers: [],
 /// // Flutter apps: use SecmailCryptoFlutter.initialize() from secmail_crypto_flutter.
 ///     onLog: (level, msg, [err]) => print('[$level] $msg ${err ?? ''}'),
 ///   ),
@@ -27,7 +27,7 @@ class CryptoSdkConfig {
 
   /// Strategy used when the SDK dispatches crypto work on behalf of a provider.
   ///
-  /// Providers that manage their own concurrency (OpenPGP, S/MIME) are not
+  /// Providers that manage their own concurrency (OpenPGP) are not
   /// affected by this strategy — they always execute inline.
   ///
   /// Defaults to [DirectExecutionStrategy] (inline execution).

@@ -155,13 +155,13 @@ void main() {
       expect(identical(second, CryptoSdk.instance), isTrue);
     });
 
-    test('initialize auto-registers built-in providers by default', () {
+    test('initialize does not auto-register providers in the core SDK', () {
       CryptoSdk.reset();
       final sdk = CryptoSdk.initialize(
         CryptoSdkConfig(storageProvider: _InMemoryStorageProvider()),
       );
 
-      expect(sdk.hasProvider(CryptoAlgorithm.smime), isTrue);
+      expect(sdk.hasProvider(CryptoAlgorithm.smime), isFalse);
       expect(sdk.hasProvider(CryptoAlgorithm.openPgp), isFalse);
     });
   });

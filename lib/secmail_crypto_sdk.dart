@@ -1,6 +1,5 @@
 // SecMail Crypto SDK
-// A self-contained Flutter package providing OpenPGP and S/MIME cryptographic
-// operations via a unified provider-based API.
+// OpenPGP parsing and SDK core. Crypto operations live in secmail_crypto_flutter.
 //
 // Import only this file from consumer code:
 //   import 'package:secmail_crypto_sdk/secmail_crypto_sdk.dart';
@@ -10,7 +9,6 @@ export 'src/core/contracts/i_execution_strategy.dart';
 export 'src/core/contracts/i_key_inspection_provider.dart';
 export 'src/core/contracts/i_message_inspection_provider.dart';
 export 'src/core/contracts/i_storage_provider.dart';
-export 'src/core/contracts/i_certificate_signing_service.dart';
 
 // ── Public models ──────────────────────────────────────────────────────────
 export 'src/core/models/crypto_algorithm.dart';
@@ -38,9 +36,6 @@ export 'src/storage/in_memory_storage_provider.dart';
 
 // ── OpenPGP message parser (pure Dart; crypto ops in secmail_crypto_flutter) ─
 export 'src/providers/openpgp/parsing/openpgp_message_parser.dart';
-
-// ── Built-in provider (S/MIME; OpenPGP via secmail_crypto_flutter) ─────────
-export 'src/providers/smime/smime_crypto_provider.dart';
 
 // ── Private key protection (PBKDF2 + AES-256-GCM backup cipher) ───────────
 export 'src/key_protection/private_key_protection.dart';

@@ -1,5 +1,5 @@
 name: secmail_crypto_sdk
-description: Pure Dart crypto SDK (S/MIME, parsers, pubkey helpers). OpenPGP/Flutter in secmail_crypto_flutter.
+description: Pure Dart crypto SDK (OpenPGP parsers, pubkey helpers). OpenPGP/Flutter in secmail_crypto_flutter.
 version: 0.1.0
 publish_to: none
 
@@ -9,9 +9,6 @@ environment:
 dependencies:
   cryptography: ^2.7.0
   crypto: ^3.0.7
-  ffi: ^2.1.4
-  openssl:
-    path: ../../advforks/openssl-dart
 
 dev_dependencies:
   lints: ^6.0.0

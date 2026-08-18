@@ -16,7 +16,6 @@ import '../core/models/key_metadata.dart';
 import '../core/models/key_type.dart';
 import '../core/models/signature_verification_result.dart';
 import '../core/registry/provider_registry.dart';
-import '../providers/smime/smime_crypto_provider.dart';
 import '../storage/in_memory_storage_provider.dart';
 import 'crypto_sdk_config.dart';
 
@@ -33,7 +32,7 @@ import 'crypto_sdk_config.dart';
 ///   - SDK-managed secure storage for key pairs
 ///
 /// All algorithm-specific logic lives inside provider adapters
-/// ([OpenPgpCryptoProvider], [SmimeCryptoProvider]). The SDK core is
+/// ([OpenPgpCryptoProvider]). The SDK core is
 /// intentionally unaware of any concrete algorithm (Dependency Inversion).
 class CryptoSdk {
   static CryptoSdk? _instance;
@@ -94,9 +93,7 @@ class CryptoSdk {
     required CryptoSdkConfig config,
     required CryptoLogger logger,
   }) {
-    return [
-      SmimeCryptoProvider(logger: logger),
-    ];
+    return const <ICryptoProvider>[];
   }
 
   /// The singleton instance.
@@ -270,7 +267,6 @@ class CryptoSdk {
   ///
   /// The concrete return type depends on the algorithm:
   /// - OpenPGP → [OpenPgpPublicKeyMetadata]
-  /// - S/MIME  → [SmimePublicKeyMetadata]
   ///
   /// Throws [CryptoOperationException] if the registered provider for [key]'s
   /// algorithm does not implement [IKeyInspectionProvider].
@@ -296,7 +292,6 @@ class CryptoSdk {
   ///
   /// The concrete return type depends on the algorithm:
   /// - OpenPGP → [OpenPgpPrivateKeyMetadata]
-  /// - S/MIME  → [SmimePrivateKeyMetadata]
   ///
   /// Throws [CryptoOperationException] if the registered provider for [key]'s
   /// algorithm does not implement [IKeyInspectionProvider].
@@ -323,12 +318,10 @@ class CryptoSdk {
   /// Parses [ciphertext] and returns structured metadata without decrypting.
   ///
   /// For OpenPGP this includes all PKESK packets (recipient [keyId]s,
-  /// public-key algorithms, etc.). For S/MIME this includes all CMS recipient
-  /// info records (issuer/serial, SKI, key encryption algorithm, etc.).
+  /// public-key algorithms, etc.).
   ///
   /// The concrete return type depends on the algorithm:
   /// - OpenPGP → [OpenPgpEncryptedMessageMetadata]
-  /// - S/MIME  → [SmimeEncryptedMessageMetadata]
   ///
   /// Throws [CryptoOperationException] if the registered provider for
   /// [algorithm] does not implement [IMessageInspectionProvider].
@@ -370,22 +363,11 @@ class CryptoSdk {
     };
   }
 
-  /// Returns all recipient certificate IDs from an S/MIME encrypted message.
-  ///
-  /// Multi-recipient messages include one CMS recipient info per certificate,
-  /// so this always returns a [List] (empty when none found, one element for
-  /// single-recipient messages, multiple for multi-recipient).
+  /// Returns recipient identifiers from an encrypted message.
   Future<List<String>> getRecipientCertIds({
     required Uint8List ciphertext,
   }) async {
-    final parsed = await parseEncryptedMessage(
-      ciphertext: ciphertext,
-      algorithm: CryptoAlgorithm.smime,
-    );
-    return switch (parsed) {
-      SmimeEncryptedMessageMetadata meta => meta.recipientCertIds,
-      _ => const [],
-    };
+    return const [];
   }
 
   // ── SDK-managed secure storage ─────────────────────────────────────────────

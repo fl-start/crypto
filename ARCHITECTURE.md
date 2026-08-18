@@ -1,6 +1,6 @@
 # Architecture
 
-This repo is **OpenPGP / S/MIME engines and secure storage**. The Pubkey
+This repo is **OpenPGP engines and secure storage**. The Pubkey
 protocol (MSK, Vault HTTP, `POST /v1/mutate`, discovery) lives in the
 SComm adapters (`secmail_pubkey_sdk` in secMail0, `@scomm/pubkey` in Office).
 Do not implement enroll/mutate here.
@@ -14,9 +14,7 @@ Do not implement enroll/mutate here.
 
 ## Rules for `secmail_crypto_sdk`
 
-- No `flutter`, `openpgp`, or `http`/`dio` in this package's `pubspec.yaml`.
-- S/MIME via bundled OpenSSL **libcrypto** (`SmimeLibcryptoBackend`).
-- The `openssl` CLI engine is test-only quarantine (`SmimeOpensslEngine`).
+- No `flutter`, `openpgp`, `openssl`, `ffi`, or `http`/`dio` in this package's `pubspec.yaml`.
 - Parsers and in-memory storage stay here.
 - No pubkey protocol helpers (`X-Auth-Payload`, decrypt-challenge, upload catalog).
 
