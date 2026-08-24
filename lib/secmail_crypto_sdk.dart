@@ -37,6 +37,12 @@ export 'src/storage/in_memory_storage_provider.dart';
 // ── OpenPGP message parser (pure Dart; crypto ops in secmail_crypto_flutter) ─
 export 'src/providers/openpgp/parsing/openpgp_message_parser.dart';
 
+// ── OpenPGP raw secret-key extraction (pure Dart; see class doc for why) ──
+export 'src/providers/openpgp/parsing/openpgp_secret_key_parser.dart';
+
+// ── OpenPGP public-key packet re-tagging (primary/subkey -> standalone tag 6) ─
+export 'src/providers/openpgp/parsing/openpgp_public_key_repacker.dart';
+
 // ── Private key protection (PBKDF2 + AES-256-GCM backup cipher) ───────────
 export 'src/key_protection/private_key_protection.dart';
 

@@ -177,6 +177,37 @@ void main() {
       expect(meta.pkesks.single.keyId, '41499A2CE5CAA324');
     });
 
+    test('extracts PKESKs when the final packet uses partial body length', () {
+      // Real encryptors (e.g. streaming gopenpgp output) commonly encode
+      // the large SEIPD packet with RFC 4880 §4.2.2.4 partial body length
+      // (first length octet 224-254) instead of a fixed length. This
+      // parser only needs the PKESKs, which always precede it.
+      const keyId = [0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0];
+      final pkesk = _packet(
+        1,
+        Uint8List.fromList([
+          0x03,
+          ...keyId,
+          18, // ECDH
+          ...List.filled(16, 0xCC),
+        ]),
+      );
+      // New-format tag 18 (0xD2) with a partial-length first octet (0xE9 = 233)
+      // followed by an arbitrarily large "first chunk" payload.
+      final partialLengthSeipd = Uint8List.fromList([
+        0xD2,
+        0xE9,
+        ...List.filled(300, 0xEE),
+      ]);
+      final binary = Uint8List.fromList([...pkesk, ...partialLengthSeipd]);
+
+      final meta = OpenPgpMessageParser.parse(binary);
+
+      expect(meta.pkesks, hasLength(1));
+      expect(meta.pkesks.single.keyId, '123456789ABCDEF0');
+      expect(meta.packetTags, [1, 18]);
+    });
+
     test('throws on invalid armor', () {
       expect(
         () => OpenPgpMessageParser.parse(utf8.encode('not a pgp message')),

@@ -62,10 +62,14 @@ class OpenPgpCryptoProvider
     _assertAlgorithm(recipientPublicKeys);
 
     // The openpgp package accepts concatenated armored public-key blocks for
-    // multi-recipient encryption in a single pass.
-    final combinedKey = recipientPublicKeys
-        .map((k) => k.rawBytes)
-        .reduce((acc, bytes) => Uint8List.fromList([...acc, ...bytes]));
+    // multi-recipient encryption in a single pass. Blocks must be newline-
+    // separated — our directory-sourced armor (PgpArmor.armorPublicKey) has
+    // no trailing newline, so gluing two blocks together corrupts the second
+    // block's BEGIN marker (`...BLOCK----------BEGIN PGP...BLOCK-----`) and
+    // the whole encrypt call fails as soon as more than one key is combined.
+    final combinedKey = _joinArmoredKeyBlocks(
+      recipientPublicKeys.map((k) => k.rawBytes),
+    );
 
     try {
       final result = await _pool.run(
@@ -397,6 +401,18 @@ class OpenPgpCryptoProvider
       );
     }
   }
+}
+
+/// Joins ASCII-armored OpenPGP public-key blocks with a newline so each
+/// block's `-----BEGIN PGP PUBLIC KEY BLOCK-----` marker starts on its own
+/// line. Callers must not assume every armored block already ends in `\n`.
+Uint8List _joinArmoredKeyBlocks(Iterable<Uint8List> blocks) {
+  final list = blocks.toList();
+  if (list.length == 1) return list.first;
+  final newline = Uint8List.fromList(const [0x0A]);
+  return list
+      .expand((bytes) => [bytes, newline])
+      .reduce((acc, bytes) => Uint8List.fromList([...acc, ...bytes]));
 }
 
 // ── Top-level helpers (isolate-safe) ──────────────────────────────────────

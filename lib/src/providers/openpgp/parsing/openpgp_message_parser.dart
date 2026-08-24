@@ -196,9 +196,17 @@ class OpenPgpMessageParser {
       return (length: length, bytesRead: 5);
     }
 
-    throw CryptoArgumentException(
-      'Unsupported OpenPGP partial body length encoding ($first).',
-    );
+    // 224-254: partial body length (RFC 4880 §4.2.2.4) — a real, standard
+    // streaming encoding encoders use for large packets (typically the
+    // Sym. Encrypted Integrity Protected Data packet) whose full length
+    // isn't known upfront. Fully reconstructing a partial-length packet's
+    // true body would mean scanning through however many further partial
+    // chunks follow, which this metadata-only parser has no need to do:
+    // every packet it actually cares about (PKESK/SKESK) always precedes
+    // the large payload packet in a well-formed OpenPGP message. Treat the
+    // rest of the buffer as this packet's body so the walk ends cleanly
+    // here instead of throwing.
+    return (length: data.length - (offset + 1), bytesRead: 1);
   }
 
   static ({int length, int bytesRead}) _readOldFormatLength(
